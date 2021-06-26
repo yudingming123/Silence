@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.tm.silence</groupId>
+    <groupId>com.tm.orm</groupId>
     <artifactId>silence-parent</artifactId>
     <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
@@ -12,6 +12,7 @@
         <module>silence</module>
         <module>silence-spring-boot-starter</module>
         <module>silence-sequence</module>
+        <module>test</module>
     </modules>
 
     <properties>
@@ -21,19 +22,24 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.tm.silence</groupId>
+                <groupId>com.tm.orm</groupId>
                 <artifactId>silence</artifactId>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tm.orm</groupId>
+                <artifactId>silence-spring-boot-starter</artifactId>
                 <version>1.0-SNAPSHOT</version>
             </dependency>
             <!--springboot相关-->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-jdbc</artifactId>
+                <artifactId>spring-boot-starter-web</artifactId>
                 <version>2.3.7.RELEASE</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-web</artifactId>
+                <artifactId>spring-boot-starter-jdbc</artifactId>
                 <version>2.3.7.RELEASE</version>
             </dependency>
             <!--@ConfigurationProperties注解-->
@@ -99,6 +105,12 @@
                 <artifactId>commons-jexl</artifactId>
                 <version>2.1.1</version>
             </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>2.3.7.RELEASE</version>
+            </dependency>
+
         </dependencies>
 
     </dependencyManagement>

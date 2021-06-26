@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-  com.tm.silence.config.SilenceAutoConfig
+  com.tm.orm.starter.config.SilenceAutoConfig
