@@ -9,10 +9,7 @@ import org.apache.commons.jexl2.MapContext;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,6 +19,8 @@ import java.util.regex.Pattern;
  * @Desc
  */
 public class SqlBuilder {
+    private final JexlEngine jexlEngine = new JexlEngine();
+
     public static void main(String[] args) {
         String s = "SELECT partition_name name, partition_expression expression, partition_description description, table_rows tableRows " +
                 "FROM information_schema.PARTITIONS" +
@@ -50,19 +49,17 @@ public class SqlBuilder {
     }
 
     /**
-     * @Author yudm
-     * @Date 2020/9/25 15:49
-     * @Param [tableName, columns]
+     * @Param [tableName 表明, columns 列名]
      * @Desc 构建插入sql
      */
     public String buildInsertSql(String tableName, List<String> columns) {
-        StringBuilder sql = new StringBuilder("INSERT INTO ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName)).append(" (");
+        StringBuilder sql = new StringBuilder("insert into ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName)).append(" (");
         for (String column : columns) {
             sql.append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, column)).append(",");
         }
         //去掉最后一个“,”号
         sql.deleteCharAt(sql.length() - 1);
-        sql.append(") VALUES (");
+        sql.append(") values (");
         for (int i = 0; i < columns.size(); ++i) {
             sql.append("?,");
         }
@@ -73,13 +70,11 @@ public class SqlBuilder {
     }
 
     /**
-     * @Author yudm
-     * @Date 2020/9/25 15:49
-     * @Param [tableName, columns]
-     * @Desc 构建更新sql
+     * @Param [tableName 表明, columns 列名]
+     * @Desc 构建更新sql，以第一个字段作为主键
      */
     public String buildUpdateSql(String tableName, List<String> columns) {
-        StringBuilder sql = new StringBuilder("UPDATE ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName)).append(" SET ");
+        StringBuilder sql = new StringBuilder("update ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName)).append(" set ");
         for (String column : columns) {
             sql.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, column)).append("=?,");
         }
@@ -90,35 +85,35 @@ public class SqlBuilder {
     }
 
     /**
-     * @Author yudm
-     * @Date 2020/9/25 15:49
-     * @Param [tableName, columns]
+     * @Param [tableName 表明, keyName 主键名]
      * @Desc 构建删除sql
      */
     public String buildDeleteSql(String tableName, String keyName) {
-        return "DELETE FROM " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName) + " WHERE " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, keyName) + "=?";
+        return "delete from " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName) + " where " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, keyName) + "=?";
     }
 
     /**
-     * @Author yudm
-     * @Date 2020/9/25 15:49
-     * @Param [tableName, columns]
-     * @Desc 构建查询sql
+     * @Param [tableName 表名, columns 列名即查询条件]
+     * @Desc 构建查询sql 多条件都已and连接
      */
     public String buildSelectSql(String tableName, List<String> columns) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName));
+        StringBuilder sql = new StringBuilder("select * from ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName));
         if (null == columns || columns.size() < 1) {
             return sql.toString();
         }
-        sql.append(" WHERE ");
+        sql.append(" where ");
         for (String column : columns) {
-            sql.append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, column)).append("=? AND ");
+            sql.append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, column)).append("=? and ");
         }
-        //去掉最后一个空格和AND号
+        //去掉最后一个空格和and
         sql.delete(sql.length() - 5, sql.length() - 1);
         return sql.toString();
     }
 
+    /**
+     * @Param [pSql 动态sql, param 入参, values 占位符对应的值]
+     * @Desc 解析构建动态sql
+     **/
     public String build(String pSql, Map<String, Object> param, List<Object> values) {
         ArrayList<Entry> ens = entries(pSql);
         if (ens.size() == 0) {
@@ -132,12 +127,16 @@ public class SqlBuilder {
                 //截取第i个动态语句
                 String ds = pSql.substring(en.getBegin(), en.getEnd() + 1);
                 //如果是if语句块
-                if (ds.startsWith("&[")) {
+                if (ds.startsWith("&\\[")) {
                     sb.append(ifBlock(ds, param, values));
                 }
                 //如果是where语句块
-                if (ds.startsWith("@[")) {
+                if (ds.startsWith("@\\[")) {
                     sb.append(whereBlock(ds, param, values));
+                }
+                //如果是foreach语句块
+                if (ds.startsWith("%\\[")) {
+                    sb.append(foreachBlock(ds, param, values));
                 }
                 if (i < ens.size() - 1) {
                     //截取最后的非动态语句
@@ -222,6 +221,34 @@ public class SqlBuilder {
         return param;
     }
 
+    public Map<String, Object> getCv(Object obj, boolean selective) {
+        if (null == obj) {
+            throw new SqlException("value can not be null");
+        }
+        if (obj instanceof Map) {
+            return (Map<String, Object>) obj;
+        }
+        Field[] fields = obj.getClass().getDeclaredFields();
+        Map<String, Object> param = new HashMap<>();
+        for (Field field : fields) {
+            if (Modifier.isStatic(field.getModifiers())) {
+                continue;
+            }
+            try {
+                boolean flag = field.isAccessible();
+                field.setAccessible(true);
+                if (selective && null == field.get(obj)) {
+                    continue;
+                }
+                param.put(field.getName(), field.get(obj));
+                field.setAccessible(flag);
+            } catch (IllegalAccessException e) {
+                throw new SqlException(e);
+            }
+        }
+        return param;
+    }
+
     private String paramBlock(String pSql, Map<String, Object> param, List<Object> values) {
         if (pSql.contains("#{")) {
             ArrayList<String> ks = extractAll(pSql, "#\\{.*?}");
@@ -252,28 +279,6 @@ public class SqlBuilder {
                     pSql = pSql.replace(t, String.valueOf(obj));
                 }
             }
-        } else if (pSql.contains("%{")) {
-            ArrayList<String> ks = extractAll(pSql, "%\\{.*?}");
-            for (String t : ks) {
-                String k = t.replaceAll("%\\{|}", "");
-                if (!param.containsKey(k)) {
-                    throw new SqlException("there is no field named:" + k);
-                }
-                Object obj = param.get(k);
-                if (obj instanceof List) {
-                    List<?> list = (List<?>) obj;
-                    StringBuilder b = new StringBuilder("(");
-                    for (Object o : list) {
-                        b.append("?,");
-                        values.add(o);
-                    }
-                    b.deleteCharAt(b.length() - 1);
-                    b.append(")");
-                    pSql = pSql.replaceAll(t, b.toString());
-                } else {
-                    throw new SqlException(k + "is not a list");
-                }
-            }
         }
         return pSql + " ";
     }
@@ -285,9 +290,8 @@ public class SqlBuilder {
         }
         //截取真正的条件表达式
         String cd = str.replaceAll("&\\[|:", "").replaceAll("'", "\"");
-        JexlEngine je = new JexlEngine();
-        Expression ep = je.createExpression(cd);
-        JexlContext jc = new MapContext();
+        Expression expression = jexlEngine.createExpression(cd);
+        JexlContext jexlContext = new MapContext();
         //条件表达式中的变量名
         ArrayList<String> ks = extractAll(ds, "(\\[|&&|\\|\\|).+?[!=><]");
         for (String k : ks) {
@@ -296,9 +300,9 @@ public class SqlBuilder {
             if (null == param || !param.containsKey(k)) {
                 throw new SqlException("there is no field named:" + k);
             }
-            jc.set(k, param.get(k));
+            jexlContext.set(k, param.get(k));
         }
-        if ((boolean) ep.evaluate(jc)) {
+        if ((boolean) expression.evaluate(jexlContext)) {
             return build(extract(ds, ":.*]").replaceAll("[:\\]]", ""), param, values);
         }
         return "";
@@ -310,10 +314,48 @@ public class SqlBuilder {
             return "";
         }
         //把多余的and或or去掉
-        if (match(w, "\\s*((?i)and|or).*")) {
+        if (Pattern.compile("\\s*((?i)and|or).*").matcher(w).matches()) {
             w = w.replaceFirst("\\s*(?i)and|or", "");
         }
         return "where" + w;
+    }
+
+    private String foreachBlock(String ds, Map<String, Object> param, List<Object> values) {
+        String attribute = extract(ds, "%\\[.+?:").replaceAll("%\\[|:", "");
+        String[] attributes = attribute.split(",");
+        if (attributes.length < 5) {
+            throw new SqlException("bad foreach statement");
+        }
+        Map<String, String> attributeMap = new HashMap<>(5);
+        for (String a : attributes) {
+            String[] kv = a.split("=");
+            if (kv.length < 2) {
+                throw new SqlException("bad foreach statement");
+            }
+            attributeMap.put(kv[0].trim(), kv[1].trim());
+        }
+        if (!attributeMap.keySet().containsAll(Arrays.asList("o", "c", "s", "i", "v"))) {
+            throw new SqlException("Attribute [o,c,s,i,v] is necessary");
+        }
+        //截取真正的条件表达式
+        String k = attributeMap.get("v");
+        if (null == param || !param.containsKey(k)) {
+            throw new SqlException("there is no field named:" + k);
+        }
+        Object v = param.get(k);
+        StringBuilder sb = new StringBuilder();
+        sb.append(attributeMap.get("o"));
+        if (v instanceof Collection) {
+            for (Object obj : (Collection) v) {
+                param.put(attributeMap.get("i"), obj);
+                sb.append(build(extract(ds, ":.*]").replaceAll("[:\\]]", ""), param, values));
+                sb.append(attributeMap.get("s"));
+            }
+        }
+        sb.deleteCharAt(sb.length() - 1);
+        sb.append(attributeMap.get("c"));
+        sb.append(" ");
+        return sb.toString();
     }
 
     private String extract(String str, String regex) {
@@ -362,9 +404,6 @@ public class SqlBuilder {
         return ens;
     }
 
-    private Boolean match(String str, String regex) {
-        return Pattern.compile(regex).matcher(str).matches();
-    }
 
     static class Entry {
         private int begin;

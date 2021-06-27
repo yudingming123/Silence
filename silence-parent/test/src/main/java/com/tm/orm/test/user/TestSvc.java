@@ -69,7 +69,7 @@ public class TestSvc {
             Table.insert(test);
         }
         long end = System.currentTimeMillis();
-        Table.execute("delete from test", null);
+        Table.update("delete from test", null);
         return end - begin;
     }
 
@@ -83,7 +83,7 @@ public class TestSvc {
             testMapper.insert();
         }
         long end = System.currentTimeMillis();
-        Table.execute("delete from test", null);
+        Table.update("delete from test", null);
         return end - begin;
     }
 
@@ -91,10 +91,10 @@ public class TestSvc {
     public Long add11() {
         long begin = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i) {
-            Table.execute("insert into test (name) values ('1')", null);
+            Table.update("insert into test (name) values ('1')", null);
         }
         long end = System.currentTimeMillis();
-        Table.execute("delete from test", null);
+        Table.update("delete from test", null);
         return end - begin;
     }
 
@@ -105,7 +105,7 @@ public class TestSvc {
             testMapper.insert();
         }
         long end = System.currentTimeMillis();
-        Table.execute("delete from test", null);
+        Table.update("delete from test", null);
         return end - begin;
     }
 
