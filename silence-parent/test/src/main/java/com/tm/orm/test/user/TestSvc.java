@@ -17,6 +17,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -158,5 +163,92 @@ public class TestSvc {
         }
 
     }
+
+    public static final byte[][][] model = new byte[9][11][30];
+
+    public static void main(String[] args) {
+     /*
+    __  嵌套映射
+    @[  where语句块
+    &[  if语句块
+    %[  foreach语句块
+     */
+    /*String s = "SELECT partition_name name, partition_expression expression, partition_description description, table_rows tableRows " +
+            "FROM information_schema.PARTITIONS" +
+            "@[" +
+            "&[tableName!= null&&tableName != '': AND table_name = ${tableName}]" +
+            "&[beginTime != null: AND partition_description>=#{beginTime}]" +
+            "&[endTime != null: AND partition_description<=#{endTime}]" +
+            "]";
+    Map<String, Object> map = new HashMap<>();
+    map.put("tableName", "sss");
+    map.put("beginTime", 1);
+    map.put("endTime", 2);
+    *//*SqlBuilder builder = new SqlBuilder(null);
+    List<Object> list = new ArrayList<>();
+    String sql = builder.build(s, map, list);
+    System.out.println(sql);*//*
+
+    long b = System.currentTimeMillis();
+    *//*for (int i = 0; i < 1000; ++i) {
+        String s1 = builder.build(s, map, list);
+    }*//*
+    long e = System.currentTimeMillis();
+    System.out.println(e - b);*/
+        TreeSet<Integer> set = new TreeSet<>();
+        TreeMap<Integer, Integer> map1 = new TreeMap<>();
+        byte b1 = 10;
+        LocalDate date = LocalDate.now();
+        int y = date.getYear();
+        int m = date.getMonthValue();
+        int d = date.getDayOfYear();
+        int d1 = date.getDayOfMonth();
+        long t = date.toEpochDay();
+        System.out.println(y);
+        System.out.println(m);
+        System.out.println(d);
+        System.out.println(d1);
+        System.out.println(t);
+        System.out.println(LocalDate.ofYearDay(2021,182));
+
+        byte[][][] model = new byte[9][11][30];
+
+
+    }
+
+    private static boolean isTradingDay(LocalDate date) {
+        byte year = (byte) date.getYear();
+        byte month = (byte) date.getMonthValue();
+        byte day = (byte) date.getDayOfMonth();
+        return 1 == model[year - 1][month - 1][day - 1];
+    }
+
+    private static Optional<LocalDate> queryNextTradingDay(LocalDate date) {
+        byte year = (byte) date.getYear();
+        byte month = (byte) date.getMonthValue();
+        byte day = (byte) date.getDayOfMonth();
+
+        int y = year - 1;
+        int m = month - 1;
+        int d = day;
+        for (; y < 10; ++y) {
+            byte[][] ms = model[y];
+            for (; m < 12; ++m) {
+                byte[] ds = ms[m];
+                for (; d < 31; ++d) {
+                    if (ds[d] == 1) {
+                        break;
+                    }
+                }
+            }
+        }
+        return Optional.of(LocalDate.of(2020 + y + 1, m + 1, d + 1));
+    }
+
+    private static List<LocalDate> queryBetween(LocalDate from, LocalDate to){
+
+        return null;
+    }
+
 
 }
