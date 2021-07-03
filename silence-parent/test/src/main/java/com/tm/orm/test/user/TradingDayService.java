@@ -10,6 +10,9 @@ import java.util.Optional;
  * @Desc
  */
 public interface TradingDayService {
+    //添加交易日
+    void addTradingDay(LocalDate date);
+
     //判断是否为交易日
     boolean isTradingDay(LocalDate date);
 

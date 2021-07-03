@@ -3,7 +3,7 @@
 <mapper namespace="com.tm.orm.test.dao.mapper.TestMapper">
     <insert id="insert">
         insert into test (name)
-        values ('2')
+        values ("2")
     </insert>
 
 </mapper>

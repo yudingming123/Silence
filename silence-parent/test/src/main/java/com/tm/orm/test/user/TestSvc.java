@@ -181,7 +181,7 @@ public class TestSvc {
     /*String s = "SELECT partition_name name, partition_expression expression, partition_description description, table_rows tableRows " +
             "FROM information_schema.PARTITIONS" +
             "@[" +
-            "&[tableName!= null&&tableName != '': AND table_name = ${tableName}]" +
+            "&[tableName!= null&&tableName != "": AND table_name = ${tableName}]" +
             "&[beginTime != null: AND partition_description>=#{beginTime}]" +
             "&[endTime != null: AND partition_description<=#{endTime}]" +
             "]";
