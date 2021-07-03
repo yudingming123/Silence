@@ -41,6 +41,11 @@ public class TestCtrl {
         return testSvc.add22();
     }
 
+    @GetMapping("/addList")
+    public int addList() {
+        return testSvc.addList();
+    }
+
 
     @GetMapping("/dusu")
     public void dusu() throws Exception {

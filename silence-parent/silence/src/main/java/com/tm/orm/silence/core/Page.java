@@ -8,14 +8,24 @@ import java.util.List;
  * @Desc
  */
 public class Page<T> {
+    private boolean searchTotal;
     private int total;
     private int pageNum;
     private int pageSize;
     private List<T> list;
 
-    public Page(int pageNum, int pageSize) {
+    public Page(int pageNum, int pageSize, boolean searchTotal) {
         this.pageNum = pageNum;
         this.pageSize = pageSize;
+        this.searchTotal = searchTotal;
+    }
+
+    public boolean isSearchTotal() {
+        return searchTotal;
+    }
+
+    public void setSearchTotal(boolean searchTotal) {
+        this.searchTotal = searchTotal;
     }
 
     public int getTotal() {

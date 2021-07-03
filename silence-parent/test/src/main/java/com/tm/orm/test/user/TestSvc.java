@@ -1,6 +1,5 @@
 package com.tm.orm.test.user;
 
-import com.tm.orm.silence.core.SqlExecutor;
 import com.tm.orm.silence.core.Table;
 import com.tm.orm.test.dao.entity.Test;
 import com.tm.orm.test.dao.mapper.TestMapper;
@@ -18,10 +17,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -41,9 +37,6 @@ public class TestSvc {
     @Resource
     private TestMapper testMapper;
 
-    @Resource
-    private SqlExecutor sqlExecutor;
-
     public void insert() {
         for (int i = 0; i < 30; ++i) {
             doInsert(10 * i, 10 * i + 10);
@@ -51,7 +44,7 @@ public class TestSvc {
         for (int i = 400; i < 500; ++i) {
             Test test = new Test();
             test.setName(i + "");
-            Table.insert(test);
+            Table.insert(test, false, true);
         }
     }
 
@@ -61,7 +54,7 @@ public class TestSvc {
         for (int i = begin; i < end; ++i) {
             Test test = new Test();
             test.setId(i);
-            Table.insert(test);
+            Table.insert(test, false, true);
         }
     }
 
@@ -71,10 +64,10 @@ public class TestSvc {
         test.setName("1");
         long begin = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i) {
-            Table.insert(test);
+            Table.insert(test, false, true);
         }
         long end = System.currentTimeMillis();
-        Table.update("delete from test", null);
+        Table.simpleExecute("delete from test");
         return end - begin;
     }
 
@@ -88,7 +81,7 @@ public class TestSvc {
             testMapper.insert();
         }
         long end = System.currentTimeMillis();
-        Table.update("delete from test", null);
+        Table.simpleExecute("delete from test");
         return end - begin;
     }
 
@@ -96,10 +89,10 @@ public class TestSvc {
     public Long add11() {
         long begin = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i) {
-            Table.update("insert into test (name) values ('1')", null);
+            Table.simpleExecute("insert into test (name) values ('1')");
         }
         long end = System.currentTimeMillis();
-        Table.update("delete from test", null);
+        Table.simpleExecute("delete from test");
         return end - begin;
     }
 
@@ -110,9 +103,21 @@ public class TestSvc {
             testMapper.insert();
         }
         long end = System.currentTimeMillis();
-        Table.update("delete from test", null);
+        Table.simpleExecute("delete from test");
         return end - begin;
     }
+
+    public int addList() {
+        List<Test> tests = new ArrayList<>();
+        for (int i = 0; i < 100; ++i) {
+            Test test = new Test();
+            test.setName(i + "");
+            tests.add(test);
+        }
+        int row = Table.insertList(tests, true, true);
+        return row;
+    }
+
 
     public void stsTest() throws Exception {
         Connection cn = DataSourceUtils.getConnection(dataSource);
@@ -209,7 +214,10 @@ public class TestSvc {
         System.out.println(d);
         System.out.println(d1);
         System.out.println(t);
-        System.out.println(LocalDate.ofYearDay(2021,182));
+        System.out.println(date.toEpochDay());
+        System.out.println(LocalDate.of(2000, 1, 1).toEpochDay());
+        System.out.println(LocalDate.of(2100, 1, 1).toEpochDay());
+        System.out.println(LocalDate.ofYearDay(2021, 182));
 
         byte[][][] model = new byte[9][11][30];
 
@@ -245,7 +253,7 @@ public class TestSvc {
         return Optional.of(LocalDate.of(2020 + y + 1, m + 1, d + 1));
     }
 
-    private static List<LocalDate> queryBetween(LocalDate from, LocalDate to){
+    private static List<LocalDate> queryBetween(LocalDate from, LocalDate to) {
 
         return null;
     }
