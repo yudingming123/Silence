@@ -9,12 +9,13 @@ import javax.annotation.Resource;
 import java.util.List;
 
 /**
- * @Author yudm
- * @Date 2020/9/19 17:32
- * @Desc 用于操作数据库的类，提供一些简单通用的CURD操作，同时也可以动态的SQL语句。
+ * @author yudm
+ * @date 2020/9/19 17:32
+ * @desc 用于操作数据库的类，封装有一些简单通用的CURD操作，同时也可以执行动态的SQL语句。
  */
 @Component
 public class Table {
+    //sql语句执行器
     private static SqlExecutor sqlExecutor;
 
     @Resource
@@ -23,82 +24,90 @@ public class Table {
     }
 
     /**
-     * @Param [entity 实体类对象，用于用于映射表同时也是入参]
-     * @Desc 通用添加，null值也会写入。
-     **/
+     * @params [entity 实体对象, selective 是否过滤掉null, echoId 是否回显主键值]
+     * @desc 单条插入
+     */
     public static int insert(Object entity, boolean selective, boolean echoId) {
         return sqlExecutor.insert(entity, selective, echoId);
     }
 
     /**
-     * @Param [entities 实体对象列表]
-     * @Desc 批量插入
-     **/
+     * @params [entities 实体对象列表, selective 是否过滤掉null, echoId 是否回显主键值]
+     * @desc 批量插入
+     */
     public static <T> int insertList(List<T> entities, boolean selective, boolean echoId) {
         return sqlExecutor.insertList(entities, selective, echoId);
     }
 
     /**
-     * @Param [entity 实体类对象，用于用于映射表同时也是入参]
-     * @Desc 通过主键更新，以第一个字段作为主键
-     **/
-    public static int updateById(Object entity) {
-        return sqlExecutor.updateById(entity, false);
+     * @params [entity 实体对象, selective 是否过滤掉null]
+     * @desc 根据主键更新
+     */
+    public static int updateById(Object entity, boolean selective) {
+        return sqlExecutor.updateById(entity, selective);
     }
 
     /**
-     * @Param [entity 实体类对象，用于用于映射表同时也是入参]
-     * @Desc 通过主键更新，以第一个字段作为主键，null值不写入
-     **/
-    public static int updateByIdSelective(Object entity) {
-        return sqlExecutor.updateById(entity, true);
-    }
-
+     * @params [entities 实体对象]
+     * @desc 根据主键删除
+     */
     public static int deleteById(Object entity) {
         return sqlExecutor.deleteById(entity);
     }
 
     /**
-     * @Param [pSql 自定义动态sql, data 参数]
-     * @Desc 执行任意写操作
-     **/
+     * @params [sql 简单增删改sql语句，可含有占位符，但不能含有动态语句, data 占位符对应的参数列表]
+     * @desc 通过简单sql进行增删改
+     */
     public static int simpleExecute(String sql, Object... data) {
         return sqlExecutor.simpleExecute(sql, data);
     }
 
     /**
-     * @Param [pSql 自定义动态sql, data 参数]
-     * @Desc 执行任意写操作
-     **/
+     * @params [sql 复杂增删改sql语句，含有动态语句, data 参数]
+     * @desc 通过带有动态语句的sql进行增删改
+     */
     public static int execute(String sql, Object data) {
         return sqlExecutor.execute(sql, data);
     }
 
+    /**
+     * @params [clazz 需要返回的对象字节码, sql 简单查询sql语句，可含有占位符，但不能含有动态语句, data 占位符对应的参数列表]
+     * @desc 通过简单sql语句查询单个，
+     */
     public static <T> T simpleSelectOne(Class<T> clazz, String sql, Object... data) {
         return doSelectOne(sqlExecutor.simpleQuery(clazz, sql, data));
     }
 
     /**
-     * @Param [pSql 动态sql, data 入参, clazz 返回类型]
-     * @Desc 查询单条数据
-     **/
-    public static <T> T selectOne(Class<T> clazz, String sql, Object data) {
-        return doSelectOne(sqlExecutor.query(clazz, sql, data));
-    }
-
+     * @params [clazz 需要返回的对象字节码, sql 简单查询sql语句，可含有占位符，但不能含有动态语句, data 占位符对应的参数列表]
+     * @desc 通过简单sql语句查询多个
+     */
     public static <T> List<T> simpleSelectList(Class<T> clazz, String sql, Object data) {
         return sqlExecutor.simpleQuery(clazz, sql, data);
     }
 
     /**
-     * @Param [pSql 动态sql, data 入参, clazz 返回类型]
-     * @Desc 查询多条数据
-     **/
+     * @params [clazz 需要返回的对象类型,sql 复杂查询sql语句，含有动态语句, data 参数]
+     * @desc 通过带有动态语句的sql查询单个
+     */
+    public static <T> T selectOne(Class<T> clazz, String sql, Object data) {
+        return doSelectOne(sqlExecutor.query(clazz, sql, data));
+    }
+
+
+    /**
+     * @params [clazz 需要返回的对象类型,sql 复杂查询sql语句，含有动态语句, data 参数]
+     * @desc 通过带有动态语句的sql查询多个
+     */
     public static <T> List<T> selectList(Class<T> clazz, String sql, Object data) {
         return sqlExecutor.query(clazz, sql, data);
     }
 
-
+    /**
+     * @params [clazz 需要返回的对象字节码, page 分页对象, sql 简单查询sql语句, data 占位符对应的参数列表]
+     * @desc 通过简单sql语句分页查询
+     */
     public static <T> Page<T> simpleSelectPage(Class<T> clazz, Page<T> page, String sql, Object... data) {
         if (page.isSearchTotal()) {
             Integer count = doSelectOne(sqlExecutor.simpleQuery(Integer.class, "select count(*) from (" + sql + ")", data));
@@ -109,9 +118,9 @@ public class Table {
     }
 
     /**
-     * @Param [pageNum 当前页号, pageSize 每页大小, total 是否查询总数量, clazz 用于映射表及返回类型]
-     * @Desc 分页查询该表
-     **/
+     * @params [clazz 需要返回的对象字节码, page 分页对象, sql 复杂查询sql语句，含有动态语句, data 占位符对应的参数列表]
+     * @desc 通过带有动态语句的sql分页查询
+     */
     public static <T> Page<T> selectPage(Class<T> clazz, Page<T> page, String sql, Object data) {
         if (page.isSearchTotal()) {
             Integer count = doSelectOne(sqlExecutor.query(Integer.class, "select count(*) from (" + sql + ")", data));
@@ -122,22 +131,26 @@ public class Table {
     }
 
     /**
-     * @Param [clazz 用于映射表]
-     * @Desc 查询该表中所有数据
+     * @params [clazz 用于映射表和返回对象]
+     * @desc 查询该表中所有数据
      **/
     public static <T> List<T> selectAll(Class<T> clazz) {
         return sqlExecutor.simpleQuery(clazz, "select * from " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, clazz.getSimpleName()));
     }
 
     /**
-     * @Param [clazz 用于映射表]
-     * @Desc 查询该表总数
+     * @params [clazz 用于映射表]
+     * @desc 查询该表总数
      **/
     public static int selectCount(Class<?> clazz) {
         Integer count = doSelectOne(sqlExecutor.simpleQuery(Integer.class, "select count(*) from " + clazz.getSimpleName()));
         return null == count ? 0 : count;
     }
 
+    /**
+     * @params [list 查询结果]
+     * @desc 查询一个的执行者
+     */
     private static <T> T doSelectOne(List<T> list) {
         if (list.size() == 0) {
             return null;

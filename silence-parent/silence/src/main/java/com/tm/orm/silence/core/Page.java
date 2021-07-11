@@ -3,9 +3,9 @@ package com.tm.orm.silence.core;
 import java.util.List;
 
 /**
- * @Author yudm
- * @Date 2021/5/14 12:30
- * @Desc
+ * @author yudm
+ * @date 2021/5/14 12:30
+ * @desc 分页的信息类
  */
 public class Page<T> {
     private boolean searchTotal;
