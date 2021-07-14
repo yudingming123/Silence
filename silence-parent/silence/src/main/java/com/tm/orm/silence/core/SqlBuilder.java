@@ -19,8 +19,25 @@ import java.util.regex.Pattern;
  * @desc 构建sql的类
  */
 public class SqlBuilder {
+    //用于执行if条件表达式
     private final JexlEngine jexlEngine = new JexlEngine();
     private final ThreadLocal<List<Object>> valuesThreadLocal;
+
+    //用于查找动态语句块的开始和结束位置
+    private final Pattern dynamicLabelPt = Pattern.compile("[@&%]\\[|]");
+    //用于匹配if语句块及条件
+    private final Pattern ifLabelPt = Pattern.compile("&\\[.+?:");
+    //用于匹配if条件表达式中参数名
+    private final Pattern ifKeyPt = Pattern.compile("(\\[|&&|\\|\\|).+?[!=><]");
+    //用于匹配if和foreach语句块中的内容部分
+    private final Pattern contentPt = Pattern.compile(":.*]");
+    //用于匹配foreach语句块及属性值
+    private final Pattern foreachLabelPt = Pattern.compile("%\\[.+?:");
+    //用于匹配预编译参数
+    private final Pattern preKeyLabelPt = Pattern.compile("#\\{.*?}");
+    //用于匹配非预编译参数
+    private final Pattern keyLabelPt = Pattern.compile("\\$\\{.*?}");
+
 
     SqlBuilder(ThreadLocal<List<Object>> valuesThreadLocal) {
         this.valuesThreadLocal = valuesThreadLocal;
@@ -85,10 +102,33 @@ public class SqlBuilder {
         return sql.toString();
     }
 
-    public String build(String sql, Map<String, Object> param) {
+    /**
+     * @Param [clazz 实体类的字节码，用于映射表和获取主键名, id 主键值]
+     * @Desc 构建通过主键查询sql
+     **/
+    public String buildSelectByIdSql(Class<?> clazz, Object id) {
+        StringBuilder sql = new StringBuilder("select * from ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, clazz.getSimpleName()));
+        sql.append(" where ").append(getIdName(clazz, id)).append(" = ?");
+        return sql.toString();
+    }
+
+    /**
+     * @Param [sql 动态sql语句, data 参数]
+     * @Desc 根据动态sql和参数构建出最终的sql
+     **/
+    public String build(String sql, Object data) {
+        Map<String, Object> param = toMap(data);
+        //用于查找动态语句块的开始和结束位置
+        return doBuild(sql, param);
+    }
+
+    /**
+     * @Param [sql 动态sql语句, param map参数]
+     * @Desc 执行根据动态sql和参数构建出最终的sql
+     **/
+    private String doBuild(String sql, Map<String, Object> param) {
         ArrayList<Position> positions = getPositions(sql);
-        if (positions.size() == 0) {
-            //不存在动态语句
+        if (positions.size() == 0) {//不存在动态语句
             return paramBlock(sql, param);
         } else {
             //截取第一个非动态语句
@@ -121,6 +161,158 @@ public class SqlBuilder {
     }
 
     /**
+     * @Param [sql 动态sql语句, param map参数]
+     * @Desc 解析包含参数的语句块
+     **/
+    private String paramBlock(String sql, Map<String, Object> param) {
+        if (sql.contains("#{")) {
+            ArrayList<String> ks = extractAll(sql, this.preKeyLabelPt);
+            for (String k : ks) {
+                //真正的变量名
+                k = k.replaceAll("#\\{|}", "");
+                if (!param.containsKey(k)) {
+                    throw new SqlException("there is no param named:" + k);
+                }
+                //加入到sql参数列表中
+                valuesThreadLocal.get().add(param.get(k));
+            }
+            sql = sql.replaceAll("#\\{.*?}", "?");
+        } else if (sql.contains("${")) {
+            ArrayList<String> ks = extractAll(sql, this.keyLabelPt);
+            for (String t : ks) {
+                String k = t.replaceAll("\\$\\{|}", "");
+                if (!param.containsKey(k)) {
+                    throw new SqlException("there is no param named:" + k);
+                }
+                Object obj = param.get(k);
+                if (obj instanceof String) {
+                    sql = sql.replace(t, (String) obj);
+                } else {
+                    sql = sql.replace(t, String.valueOf(obj));
+                }
+            }
+        }
+        return sql;
+    }
+
+    /**
+     * @Param [sql 动态sql语句, param map参数]
+     * @Desc 解析if语句块
+     **/
+    private String ifBlock(String ds, Map<String, Object> param) {
+        String condition = extract(ds, this.ifLabelPt);
+        if (null == condition || condition.isEmpty()) {
+            throw new SqlException("sql statement error: there is no conditions in &[]");
+        }
+        //截取真正的条件表达式
+        condition = condition.replaceAll("&\\[|:", "").replaceAll("'", "\"");
+        Expression expression = jexlEngine.createExpression(condition);
+        JexlContext jexlContext = new MapContext();
+        //条件表达式中的变量名
+        ArrayList<String> ks = extractAll(ds, this.ifKeyPt);
+        for (String k : ks) {
+            //真正的变量名字
+            k = k.replaceAll("(\\[|&&|\\|\\|)|[!=><]|\\s*", "");
+            if (null == param || !param.containsKey(k)) {
+                throw new SqlException("there is no param named:" + k);
+            }
+            jexlContext.set(k, param.get(k));
+        }
+        //判断表达式是否成立
+        if ((boolean) expression.evaluate(jexlContext)) {
+            return doBuild(extract(ds, this.contentPt).replaceAll("[:\\]]", ""), param);
+        }
+        return "";
+    }
+
+    /**
+     * @Param [sql 动态sql语句, param map参数]
+     * @Desc 解析where语句块
+     **/
+    private String whereBlock(String ds, Map<String, Object> param) {
+        String w = doBuild(ds.substring(2, ds.length() - 1), param);
+        if (w.isEmpty()) {
+            return "";
+        }
+        //把多余的and或or去掉
+        w = w.replaceFirst("^\\s*(?i)(and|or)", "");
+        return "where" + w;
+    }
+
+    /**
+     * @Param [sql 动态sql语句, param map参数]
+     * @Desc 解析foreach语句块
+     **/
+    private String foreachBlock(String ds, Map<String, Object> param) {
+        //获取属性
+        String attribute = extract(ds, this.foreachLabelPt).replaceAll("%\\[|:", "");
+        String[] attributes = attribute.split(",");
+        if (attributes.length < 5) {
+            throw new SqlException("bad foreach statement");
+        }
+        //将属性和属性的值转化成map
+        Map<String, String> attributeMap = new HashMap<>(5);
+        for (String a : attributes) {
+            String[] kv = a.split("=");
+            if (kv.length < 2) {
+                throw new SqlException("bad foreach statement");
+            }
+            attributeMap.put(kv[0].trim(), kv[1].trim());
+        }
+        if (!attributeMap.keySet().containsAll(Arrays.asList("o", "c", "s", "i", "v"))) {
+            throw new SqlException("Attribute [o,c,s,i,v] is necessary");
+        }
+        //获取集合
+        String collectionName = attributeMap.get("v");
+        if (!param.containsKey(collectionName)) {
+            throw new SqlException("there is no field named:" + collectionName);
+        }
+        Object collection = param.get(collectionName);
+        if (!(collection instanceof Collection)) {
+            throw new SqlException(collectionName + " is not a collection");
+        }
+        //开始拼接foreach语句块
+        StringBuilder sb = new StringBuilder();
+        sb.append(attributeMap.get("o"));
+        for (Object obj : (Collection) collection) {
+            param.put(attributeMap.get("i"), obj);
+            sb.append(doBuild(extract(ds, this.contentPt).replaceAll("[:\\]]", ""), param));
+            sb.append(attributeMap.get("s"));
+        }
+        sb.deleteCharAt(sb.length() - 1);
+        sb.append(attributeMap.get("c"));
+        sb.append(" ");
+        return sb.toString();
+    }
+
+    /**
+     * @params [obj 入参]
+     * @desc 将入参转化成map
+     */
+    private Map<String, Object> toMap(Object obj) {
+        Map<String, Object> param = new HashMap<>();
+        if (null == obj) {
+            return param;
+        }
+        if (obj instanceof Map) {
+            return (Map<String, Object>) obj;
+        }
+
+        Field[] fields = obj.getClass().getDeclaredFields();
+        for (Field field : fields) {
+            boolean flag = field.isAccessible();
+            field.setAccessible(true);
+            try {
+                param.put(field.getName(), field.get(obj));
+            } catch (IllegalAccessException e) {
+                throw new SqlException(e);
+            }
+            field.setAccessible(flag);
+        }
+        return param;
+    }
+
+    /**
      * @params [tableName 表名, names 字段名]
      * @desc 真正执行构建插入sql
      */
@@ -141,131 +333,30 @@ public class SqlBuilder {
         return sql.toString();
     }
 
-    private String paramBlock(String sql, Map<String, Object> param) {
-        if (sql.contains("#{")) {
-            ArrayList<String> ks = extractAll(sql, "#\\{.*?}");
-            for (String k : ks) {
-                //真正的变量名
-                k = k.replaceAll("#\\{|}", "");
-                if (!param.containsKey(k)) {
-                    throw new SqlException("there is no field named:" + k);
-                }
-                //加入到sql参数列表中
-                valuesThreadLocal.get().add(param.get(k));
-            }
-            sql = sql.replaceAll("#\\{.*?}", "?");
-        } else if (sql.contains("${")) {
-            ArrayList<String> ks = extractAll(sql, "\\$\\{.*?}");
-            for (String t : ks) {
-                String k = t.replaceAll("\\$\\{|}", "");
-                if (!param.containsKey(k)) {
-                    throw new SqlException("there is no field named:" + k);
-                }
-                Object obj = param.get(k);
-                if (obj instanceof String) {
-                    sql = sql.replace(t, (String) obj);
-                } else {
-                    sql = sql.replace(t, String.valueOf(obj));
-                }
-            }
-        }
-        return sql + " ";
-    }
-
-    private String ifBlock(String ds, Map<String, Object> param) {
-        String str = extract(ds, "&\\[.+?:");
-        if (null == str || str.isEmpty()) {
-            throw new SqlException("sql statement error: there is no conditions in &[]");
-        }
-        //截取真正的条件表达式
-        String cd = str.replaceAll("&\\[|:", "").replaceAll("'", "\"");
-        Expression expression = jexlEngine.createExpression(cd);
-        JexlContext jexlContext = new MapContext();
-        //条件表达式中的变量名
-        ArrayList<String> ks = extractAll(ds, "(\\[|&&|\\|\\|).+?[!=><]");
-        for (String k : ks) {
-            //真正的变量名字
-            k = k.replaceAll("(\\[|&&|\\|\\|)|[!=><]|\\s*", "");
-            if (null == param || !param.containsKey(k)) {
-                throw new SqlException("there is no field named:" + k);
-            }
-            jexlContext.set(k, param.get(k));
-        }
-        if ((boolean) expression.evaluate(jexlContext)) {
-            return build(extract(ds, ":.*]").replaceAll("[:\\]]", ""), param);
+    /**
+     * @Param [str , pattern]
+     * @Desc 提取出第一个匹配的字符串
+     **/
+    private String extract(String str, Pattern pattern) {
+        Matcher matcher = pattern.matcher(str);
+        if (matcher.find()) {
+            return matcher.group(0);
         }
         return "";
     }
 
-    private String whereBlock(String ds, Map<String, Object> param) {
-        String w = build(ds.substring(2, ds.length() - 1), param);
-        if (w.isEmpty()) {
-            return "";
-        }
-        //把多余的and或or去掉
-        if (Pattern.compile("\\s*((?i)and|or).*").matcher(w).matches()) {
-            w = w.replaceFirst("\\s*(?i)and|or", "");
-        }
-        return "where" + w;
-    }
-
-    private String foreachBlock(String ds, Map<String, Object> param) {
-        String attribute = extract(ds, "%\\[.+?:").replaceAll("%\\[|:", "");
-        String[] attributes = attribute.split(",");
-        if (attributes.length < 5) {
-            throw new SqlException("bad foreach statement");
-        }
-        Map<String, String> attributeMap = new HashMap<>(5);
-        for (String a : attributes) {
-            String[] kv = a.split("=");
-            if (kv.length < 2) {
-                throw new SqlException("bad foreach statement");
-            }
-            attributeMap.put(kv[0].trim(), kv[1].trim());
-        }
-        if (!attributeMap.keySet().containsAll(Arrays.asList("o", "c", "s", "i", "v"))) {
-            throw new SqlException("Attribute [o,c,s,i,v] is necessary");
-        }
-        //截取真正的条件表达式
-        String k = attributeMap.get("v");
-        if (!param.containsKey(k)) {
-            throw new SqlException("there is no field named:" + k);
-        }
-        Object v = param.get(k);
-        StringBuilder sb = new StringBuilder();
-        sb.append(attributeMap.get("o"));
-        if (v instanceof Collection) {
-            for (Object obj : (Collection) v) {
-                param.put(attributeMap.get("i"), obj);
-                sb.append(build(extract(ds, ":.*]").replaceAll("[:\\]]", ""), param));
-                sb.append(attributeMap.get("s"));
-            }
-        }
-        sb.deleteCharAt(sb.length() - 1);
-        sb.append(attributeMap.get("c"));
-        sb.append(" ");
-        return sb.toString();
-    }
-
-    private String extract(String str, String regex) {
-        Pattern p = Pattern.compile(regex);
-        Matcher m = p.matcher(str);
-        if (m.find()) {
-            return m.group(0);
-        }
-        return "";
-    }
-
-    private ArrayList<String> extractAll(String str, String regex) {
+    /**
+     * @Param [str , pattern]
+     * @Desc 提取出所有匹配的字符串
+     **/
+    private ArrayList<String> extractAll(String str, Pattern pattern) {
         ArrayList<String> s = new ArrayList<>();
-        Pattern p = Pattern.compile(regex);
-        Matcher m = p.matcher(str);
-        while (m.find()) {
-            s.add(m.group(0));
+        Matcher matcher = pattern.matcher(str);
+        while (matcher.find()) {
+            s.add(matcher.group(0));
         }
         return s;
     }
-
 
     /**
      * @params [sql 动态sql语句]
@@ -276,25 +367,25 @@ public class SqlBuilder {
         ArrayList<Integer> begins = new ArrayList<>();
         ArrayList<Integer> ends = new ArrayList<>();
 
-        Pattern pattern = Pattern.compile("[@&%]\\[|]");
-        Matcher matcher = pattern.matcher(sql);
+        Matcher matcher = this.dynamicLabelPt.matcher(sql);
         while (matcher.find()) {
             if (matcher.group(0).contains("[")) {
                 begins.add(matcher.start());
             } else if (matcher.group(0).contains("]")) {
                 ends.add(matcher.start());
             }
-            //如果数量相同说明已经是一个完整的动态语句块
+            //如果数量相同说明已经是一个最大的完整的动态语句块
             if (begins.size() == ends.size()) {
-
+                //只获取最外层的位置
                 Position position = new Position();
                 position.setBegin(begins.get(0));
-                position.setEnd(ends.get(ends.size() - 1));
+                position.setEnd(ends.get(begins.size() - 1));
+                positions.add(position);
                 begins.clear();
                 ends.clear();
-                positions.add(position);
             }
         }
+        //如果最终数量不相等，则动态语句块没有闭合
         if (begins.size() != ends.size()) {
             throw new SqlException("sql statement error: '[' is not closed");
         }
@@ -343,7 +434,7 @@ public class SqlBuilder {
      * @params [fields 字段列表]
      * @desc 获取字段名
      */
-    public List<String> getNames(List<Field> fields) {
+    private List<String> getNames(List<Field> fields) {
         List<String> names = new ArrayList<>();
         for (Field field : fields) {
             names.add(field.getName());
@@ -355,7 +446,7 @@ public class SqlBuilder {
      * @params [entity, fields]
      * @desc 获取主键名，以第一个字段作为主键，并将对应的值存入threadLocal
      */
-    public String getIdName(Object entity, List<Field> fields) {
+    private String getIdName(Object entity, List<Field> fields) {
         Field field = fields.get(0);
         try {
             boolean accessible = field.isAccessible();
@@ -365,14 +456,33 @@ public class SqlBuilder {
         } catch (IllegalAccessException e) {
             throw new SqlException(e);
         }
-        return field.getName();
+        return CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, field.getName());
+    }
+
+    /**
+     * @Param [clazz 实体类对应的字节码]
+     * @Desc 获取主键名
+     **/
+    private String getIdName(Class<?> clazz, Object id) {
+        Field[] fields = clazz.getDeclaredFields();
+        if (fields.length < 1) {
+            throw new SqlException("there is no field in " + clazz);
+        }
+        for (Field field : fields) {
+            //排除静态成员
+            if (!Modifier.isStatic(field.getModifiers())) {
+                valuesThreadLocal.get().add(id);
+                return CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, field.getName());
+            }
+        }
+        throw new SqlException("can not find primary key in " + clazz);
     }
 
     /**
      * @params [data 入参对象,fields 字段列表]
      * @desc 获取字段的值
      */
-    public List<Object> getValues(Object data, List<Field> fields) {
+    private List<Object> getValues(Object data, List<Field> fields) {
         List<Object> columns = new ArrayList<>();
         try {
             for (Field field : fields) {
@@ -386,7 +496,6 @@ public class SqlBuilder {
         }
         return columns;
     }
-
 
     /**
      * @author yudm

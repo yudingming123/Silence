@@ -79,8 +79,13 @@ public class SqlExecutor {
      * @desc 执行带有动态语句的复杂增删改
      */
     public int execute(String sql, Object data) {
-        return doExecute(sqlBuilder.build(sql, toMap(data)));
+        return doExecute(sqlBuilder.build(sql, data));
     }
+
+    public <T> List<T> selectById(Class<T> clazz, Object id) {
+        return doQuery(sqlBuilder.buildSelectByIdSql(clazz, id), clazz);
+    }
+
 
     /**
      * @params [clazz 需要返回的对象类型, sql 简单查询sql语句，可含有占位符，但不能含有动态语句, data 占位符对应的参数列表]
@@ -96,7 +101,7 @@ public class SqlExecutor {
      * @desc 执行带有动态语句的复杂增删改
      */
     public <T> List<T> query(Class<T> clazz, String sql, Object data) {
-        return doQuery(sqlBuilder.build(sql, toMap(data)), clazz);
+        return doQuery(sqlBuilder.build(sql, data), clazz);
     }
 
     /**
@@ -183,33 +188,6 @@ public class SqlExecutor {
         } finally {
             releaseRs(null, rs);
         }
-    }
-
-    /**
-     * @params [obj 入参]
-     * @desc 将入参转化成map
-     */
-    private Map<String, Object> toMap(Object obj) {
-        Map<String, Object> param = new HashMap<>();
-        if (null == obj) {
-            return param;
-        }
-        if (obj instanceof Map) {
-            return (Map<String, Object>) obj;
-        }
-
-        Field[] fields = obj.getClass().getDeclaredFields();
-        for (Field field : fields) {
-            boolean flag = field.isAccessible();
-            field.setAccessible(true);
-            try {
-                param.put(field.getName(), field.get(obj));
-            } catch (IllegalAccessException e) {
-                throw new SqlException(e);
-            }
-            field.setAccessible(flag);
-        }
-        return param;
     }
 
     /**

@@ -44,7 +44,7 @@ public class TestSvc {
         for (int i = 400; i < 500; ++i) {
             Test test = new Test();
             test.setName(i + "");
-            Table.insert(test, false, true);
+            Table.insert(test);
         }
     }
 
@@ -54,7 +54,7 @@ public class TestSvc {
         for (int i = begin; i < end; ++i) {
             Test test = new Test();
             test.setId(i);
-            Table.insert(test, false, true);
+            Table.insert(test);
         }
     }
 
@@ -64,7 +64,7 @@ public class TestSvc {
         test.setName("1");
         long begin = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i) {
-            Table.insert(test, false, true);
+            Table.insert(test);
         }
         long end = System.currentTimeMillis();
         Table.simpleExecute("delete from test");
@@ -114,7 +114,7 @@ public class TestSvc {
             test.setName(i + "");
             tests.add(test);
         }
-        int row = Table.insertList(tests, true, true);
+        int row = Table.insertList(tests);
         return row;
     }
 
