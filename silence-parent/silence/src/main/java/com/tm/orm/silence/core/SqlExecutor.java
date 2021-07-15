@@ -24,6 +24,7 @@ public class SqlExecutor {
     private DataSource dataSource;
     //存放参数列表
     private final ThreadLocal<List<Object>> valuesThreadLocal = new ThreadLocal<>();
+    //sql语句构建器
     private final SqlBuilder sqlBuilder = new SqlBuilder(valuesThreadLocal);
 
     @PostConstruct
@@ -82,10 +83,13 @@ public class SqlExecutor {
         return doExecute(sqlBuilder.build(sql, data));
     }
 
+    /**
+     * @Param [clazz 实体类对应字节码, id 主键值]
+     * @Desc 通过主键查询
+     **/
     public <T> List<T> selectById(Class<T> clazz, Object id) {
         return doQuery(sqlBuilder.buildSelectByIdSql(clazz, id), clazz);
     }
-
 
     /**
      * @params [clazz 需要返回的对象类型, sql 简单查询sql语句，可含有占位符，但不能含有动态语句, data 占位符对应的参数列表]
@@ -97,11 +101,37 @@ public class SqlExecutor {
     }
 
     /**
+     * @params [clazz 需要返回的对象字节码, page 分页对象, sql 简单查询sql语句, data 占位符对应的参数列表]
+     * @desc 通过简单sql语句分页查询
+     */
+    public <T> Page<T> simplePage(Class<T> clazz, Page<T> page, String sql, Object... data) {
+        if (page.isSearchTotal()) {
+            Integer count = doSelectOne(simpleQuery(Integer.class, "select count(*) from (" + sql + ")", data));
+            page.setTotal(null == count ? 0 : count);
+        }
+        page.setList(simpleQuery(clazz, sql + " limit " + (page.getPageNum() - 1) + "," + page.getPageSize(), data));
+        return page;
+    }
+
+    /**
      * @params [clazz 需要返回的对象类型,sql 复杂查询sql语句，含有动态语句, data 参数]
      * @desc 执行带有动态语句的复杂增删改
      */
     public <T> List<T> query(Class<T> clazz, String sql, Object data) {
         return doQuery(sqlBuilder.build(sql, data), clazz);
+    }
+
+    /**
+     * @params [clazz 需要返回的对象字节码, page 分页对象, sql 复杂查询sql语句，含有动态语句, data 占位符对应的参数列表]
+     * @desc 通过带有动态语句的sql分页查询
+     */
+    public <T> Page<T> page(Class<T> clazz, Page<T> page, String sql, Object data) {
+        if (page.isSearchTotal()) {
+            Integer count = doSelectOne(query(Integer.class, "select count(*) from (" + sql + ")", data));
+            page.setTotal(null == count ? 0 : count);
+        }
+        page.setList(query(clazz, sql + " limit " + (page.getPageNum() - 1) + "," + page.getPageSize(), data));
+        return page;
     }
 
     /**
@@ -187,6 +217,20 @@ public class SqlExecutor {
             throw new SqlException(e);
         } finally {
             releaseRs(null, rs);
+        }
+    }
+
+    /**
+     * @params [list 查询结果]
+     * @desc 查询一个的执行者
+     */
+    public <T> T doSelectOne(List<T> list) {
+        if (list.size() == 0) {
+            return null;
+        } else if (list.size() == 1) {
+            return list.get(0);
+        } else {
+            throw new SqlException("too many result");
         }
     }
 
@@ -287,17 +331,22 @@ public class SqlExecutor {
         while (rs.next()) {
             //解析一行到一个对象中
             T t = clazz.newInstance();
+            Map<String, Object> nestMap = new HashMap<>();
             for (int i = 1; i <= count; ++i) {
                 String colName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, md.getColumnName(i));
                 Field field = fieldMap.get(colName);
                 if (null != field) {
                     boolean flag = field.isAccessible();
                     field.setAccessible(true);
-                    //从rs中获取值不要勇字段名获取，性能会很低
+                    //从rs中获取值不要用字段名获取，性能会很低
                     field.set(t, rs.getObject(i));
                     field.setAccessible(flag);
+                } else if (colName.contains("__")) {
+                    nestMap.put(colName, rs.getObject(i));
                 }
             }
+            //嵌套映射
+            //nestMap.forEach((k,v)->);
             list.add(t);
         }
         return list;

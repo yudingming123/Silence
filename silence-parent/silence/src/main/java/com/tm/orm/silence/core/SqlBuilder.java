@@ -86,9 +86,12 @@ public class SqlBuilder {
         List<Field> fields = getFields(entity, selective);
         StringBuilder sql = new StringBuilder("update ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, entity.getClass().getSimpleName())).append(" set ");
         for (String name : getNames(fields)) {
-            sql.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, name)).append("=?,");
+            sql.append("`");
+            sql.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, name)).append("` = ?, ");
         }
-        sql.append(" where ").append(getIdName(entity, fields)).append(" = ?");
+        //去掉最后的逗号
+        sql.deleteCharAt(sql.length() - 2);
+        sql.append("where ").append(getIdName(entity, fields)).append(" = ?");
         return sql.toString();
     }
 
@@ -319,7 +322,8 @@ public class SqlBuilder {
     private String doBuildInsertSql(String tableName, List<String> names) {
         StringBuilder sql = new StringBuilder("insert into ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, tableName)).append(" (");
         for (String name : names) {
-            sql.append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, name)).append(",");
+            sql.append("`");
+            sql.append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, name)).append("`,");
         }
         //去掉最后一个“,”号
         sql.deleteCharAt(sql.length() - 1);

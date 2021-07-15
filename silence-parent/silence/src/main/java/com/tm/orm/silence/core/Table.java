@@ -2,7 +2,6 @@ package com.tm.orm.silence.core;
 
 
 import com.google.common.base.CaseFormat;
-import com.tm.orm.silence.exception.SqlException;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -92,7 +91,7 @@ public class Table {
      * @Desc 通过主键查询
      **/
     public static <T> T selectById(Class<T> clazz, Object id) {
-        return doSelectOne(sqlExecutor.selectById(clazz, id));
+        return sqlExecutor.doSelectOne(sqlExecutor.selectById(clazz, id));
     }
 
     /**
@@ -108,8 +107,7 @@ public class Table {
      * @desc 查询该表总数
      **/
     public static int selectCount(Class<?> clazz) {
-        Integer count = doSelectOne(sqlExecutor.simpleQuery(Integer.class, "select count(*) from " + clazz.getSimpleName()));
-        return null == count ? 0 : count;
+        return sqlExecutor.doSelectOne(sqlExecutor.simpleQuery(Integer.class, "select count(*) from " + clazz.getSimpleName()));
     }
 
     /**
@@ -117,7 +115,7 @@ public class Table {
      * @desc 通过简单sql语句查询单个，
      */
     public static <T> T simpleSelectOne(Class<T> clazz, String sql, Object... data) {
-        return doSelectOne(sqlExecutor.simpleQuery(clazz, sql, data));
+        return sqlExecutor.doSelectOne(sqlExecutor.simpleQuery(clazz, sql, data));
     }
 
     /**
@@ -133,7 +131,7 @@ public class Table {
      * @desc 通过带有动态语句的sql查询单个
      */
     public static <T> T selectOne(Class<T> clazz, String sql, Object data) {
-        return doSelectOne(sqlExecutor.query(clazz, sql, data));
+        return sqlExecutor.doSelectOne(sqlExecutor.query(clazz, sql, data));
     }
 
     /**
@@ -149,12 +147,7 @@ public class Table {
      * @desc 通过简单sql语句分页查询
      */
     public static <T> Page<T> simpleSelectPage(Class<T> clazz, Page<T> page, String sql, Object... data) {
-        if (page.isSearchTotal()) {
-            Integer count = doSelectOne(sqlExecutor.simpleQuery(Integer.class, "select count(*) from (" + sql + ")", data));
-            page.setTotal(null == count ? 0 : count);
-        }
-        page.setList(sqlExecutor.simpleQuery(clazz, sql + " limit " + (page.getPageNum() - 1) + "," + page.getPageSize(), data));
-        return page;
+        return sqlExecutor.simplePage(clazz, page, sql, data);
     }
 
     /**
@@ -162,26 +155,7 @@ public class Table {
      * @desc 通过带有动态语句的sql分页查询
      */
     public static <T> Page<T> selectPage(Class<T> clazz, Page<T> page, String sql, Object data) {
-        if (page.isSearchTotal()) {
-            Integer count = doSelectOne(sqlExecutor.query(Integer.class, "select count(*) from (" + sql + ")", data));
-            page.setTotal(null == count ? 0 : count);
-        }
-        page.setList(sqlExecutor.query(clazz, sql + " limit " + (page.getPageNum() - 1) + "," + page.getPageSize(), data));
-        return page;
-    }
-
-    /**
-     * @params [list 查询结果]
-     * @desc 查询一个的执行者
-     */
-    private static <T> T doSelectOne(List<T> list) {
-        if (list.size() == 0) {
-            return null;
-        } else if (list.size() == 1) {
-            return list.get(0);
-        } else {
-            throw new SqlException("too many result");
-        }
+        return sqlExecutor.page(clazz, page, sql, data);
     }
 
     /**

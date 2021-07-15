@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.sql.DataSource;
+import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -171,7 +172,20 @@ public class TestSvc {
 
     public static final byte[][][] model = new byte[9][11][30];
 
-    public static void main(String[] args) {
+    /**
+     * @params [clazz 需要返回对象的字节码]
+     * @desc 一次性获取clazz的所有字段并转化成name->field的map
+     */
+    private static <T> Map<String, Field> getFieldMap(Class<T> clazz) {
+        Field[] fields = clazz.getDeclaredFields();
+        Map<String, Field> fieldMap = new HashMap<>();
+        for (Field field : fields) {
+            fieldMap.put(field.getName(), field);
+        }
+        return fieldMap;
+    }
+
+    public static void main(String[] args) throws Exception {
      /*
     __  嵌套映射
     @[  where语句块
@@ -200,7 +214,7 @@ public class TestSvc {
     }*//*
     long e = System.currentTimeMillis();
     System.out.println(e - b);*/
-        TreeSet<Integer> set = new TreeSet<>();
+        /*TreeSet<Integer> set = new TreeSet<>();
         TreeMap<Integer, Integer> map1 = new TreeMap<>();
         byte b1 = 10;
         LocalDate date = LocalDate.now();
@@ -219,7 +233,28 @@ public class TestSvc {
         System.out.println(LocalDate.of(2100, 1, 1).toEpochDay());
         System.out.println(LocalDate.ofYearDay(2021, 182));
 
-        byte[][][] model = new byte[9][11][30];
+        byte[][][] model = new byte[9][11][30];*/
+        Class<?> clazz = Test.class;
+        String[] keys = {"id", "a", "name", "nameasd", "namesdb", "namexcv", "nameghjkkjkjjklg", "namesdfffdfg", "namewetsgfgj", "namewetsgfgffj", "namewetsgffhgj", "namewetsgkufgj", "namewetsggjfgj"};
+
+        long s2 = System.nanoTime();
+        for (int i = 0; i < 100; ++i) {
+            for (String key : keys) {
+                Field field = clazz.getDeclaredField(key);
+            }
+        }
+        long e2 = System.nanoTime();
+        System.out.println(e2 - s2);
+
+        long s1 = System.nanoTime();
+        Map<String, Field> fieldMap = getFieldMap(clazz);
+        for (int i = 0; i < 100; ++i) {
+            for (String key : keys) {
+                Field field = fieldMap.get(key);
+            }
+        }
+        long e1 = System.nanoTime();
+        System.out.println(e1 - s1);
 
 
     }
