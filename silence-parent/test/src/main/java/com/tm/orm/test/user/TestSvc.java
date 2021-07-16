@@ -39,6 +39,14 @@ public class TestSvc {
     private TestMapper testMapper;
 
     public void insert() {
+        String sql1 = "select * from test";
+        Connection cn = null;
+        try {
+            cn = dataSource.getConnection();
+            PreparedStatement pst = cn.prepareStatement(sql1);
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
         for (int i = 0; i < 30; ++i) {
             doInsert(10 * i, 10 * i + 10);
         }
@@ -236,26 +244,31 @@ public class TestSvc {
         byte[][][] model = new byte[9][11][30];*/
         Class<?> clazz = Test.class;
         String[] keys = {"id", "a", "name", "nameasd", "namesdb", "namexcv", "nameghjkkjkjjklg", "namesdfffdfg", "namewetsgfgj", "namewetsgfgffj", "namewetsgffhgj", "namewetsgkufgj", "namewetsggjfgj"};
-
-        long s2 = System.nanoTime();
+        Map<String, String> map = new HashMap<>(100);
         for (int i = 0; i < 100; ++i) {
-            for (String key : keys) {
-                Field field = clazz.getDeclaredField(key);
-            }
+            map.put("" + i, "" + i);
         }
-        long e2 = System.nanoTime();
-        System.out.println(e2 - s2);
 
         long s1 = System.nanoTime();
-        Map<String, Field> fieldMap = getFieldMap(clazz);
-        for (int i = 0; i < 100; ++i) {
-            for (String key : keys) {
+        //Map<String, Field> fieldMap = getFieldMap(clazz);
+        for (int i = 0; i < 1000; ++i) {
+            /*for (String key : keys) {
                 Field field = fieldMap.get(key);
-            }
+            }*/
+            map.clear();
         }
         long e1 = System.nanoTime();
         System.out.println(e1 - s1);
 
+        long s2 = System.nanoTime();
+        for (int i = 0; i < 1000; ++i) {
+            /*for (String key : keys) {
+                Field field = clazz.getDeclaredField(key);
+            }*/
+            new HashMap<>();
+        }
+        long e2 = System.nanoTime();
+        System.out.println(e2 - s2);
 
     }
 

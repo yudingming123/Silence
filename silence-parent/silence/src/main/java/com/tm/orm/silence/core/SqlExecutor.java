@@ -212,7 +212,7 @@ public class SqlExecutor {
         try (Connection cn = getCn(); PreparedStatement pst = cn.prepareStatement(sql)) {
             fillPst(pst, valuesThreadLocal.get());
             rs = pst.executeQuery();
-            return parsRs(rs, clazz);
+            return mappingResultSet(rs, clazz);
         } catch (Exception e) {
             throw new SqlException(e);
         } finally {
@@ -319,7 +319,7 @@ public class SqlExecutor {
      * @params [rs 查询结果集, clazz 需要返回对象的字节码]
      * @desc 将结果集映射到对象中
      */
-    private <T> List<T> parsRs(ResultSet rs, Class<T> clazz) throws Exception {
+    private <T> List<T> mappingResultSet(ResultSet rs, Class<T> clazz) throws Exception {
         List<T> list = new ArrayList<>();
         if (null == rs) {
             return list;
@@ -327,29 +327,76 @@ public class SqlExecutor {
         Map<String, Field> fieldMap = getFieldMap(clazz);
         ResultSetMetaData md = rs.getMetaData();
         int count = md.getColumnCount();
+        //存放属于子对象的数据
+        Map<String, Object> anyChild = new HashMap<>();
         //跳过表头
         while (rs.next()) {
-            //解析一行到一个对象中
+            //映射一行到一个对象中
             T t = clazz.newInstance();
-            Map<String, Object> nestMap = new HashMap<>();
             for (int i = 1; i <= count; ++i) {
-                String colName = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, md.getColumnName(i));
-                Field field = fieldMap.get(colName);
+                String name = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, md.getColumnName(i));
+                Field field = fieldMap.get(name);
                 if (null != field) {
-                    boolean flag = field.isAccessible();
-                    field.setAccessible(true);
-                    //从rs中获取值不要用字段名获取，性能会很低
-                    field.set(t, rs.getObject(i));
-                    field.setAccessible(flag);
-                } else if (colName.contains("__")) {
-                    nestMap.put(colName, rs.getObject(i));
+                    setFieldValue(t, field, rs.getObject(i));
+                } else if (name.contains("__")) {//属于子对象的数据
+                    anyChild.put(name, rs.getObject(i));
                 }
             }
-            //嵌套映射
-            //nestMap.forEach((k,v)->);
+            //映射子对象
+            mappingChild(t, fieldMap, anyChild);
             list.add(t);
+            anyChild.clear();
         }
         return list;
+    }
+
+    private void mappingChild(Object parent, Map<String, Field> parentFieldMap, Map<String, Object> anyChild) throws Exception {
+        //存放 子对象名->(子对象中字段名->值)
+        Map<String, Map<String, Object>> childMap = new HashMap<>();
+        anyChild.forEach((k, v) -> {
+            int firstIndex = k.indexOf("__");
+            //子对象名
+            String head = k.substring(0, firstIndex);
+            //子对象中字段名
+            String name = k.substring(firstIndex + 2, k.length() - 1);
+            if (childMap.containsKey(head)) {
+                childMap.get(head).put(name, v);
+            } else {
+                Map<String, Object> map = new HashMap<>();
+                map.put(name, v);
+                childMap.put(head, map);
+            }
+        });
+        //逐个映射所有的子对象
+        Map<String, Object> childAnyMap = new HashMap<>();
+        for (Map.Entry<String, Map<String, Object>> childEntry : childMap.entrySet()) {
+            Field parentField = parentFieldMap.get(childEntry.getKey());
+            Class<?> clazz = parentField.getType();
+            Object child = clazz.newInstance();
+            Map<String, Field> childFieldMap = getFieldMap(clazz);
+            //开始映射子对象
+            for (Map.Entry<String, Object> entry : childEntry.getValue().entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                Field childField = childFieldMap.get(name);
+                if (null != childField) {
+                    setFieldValue(child, childField, value);
+                } else if (entry.getKey().contains("__")) {//属于子对象的子对象的数据
+                    childAnyMap.put(name, value);
+                }
+            }
+            //递归映射子对象的子对象
+            mappingChild(child, childFieldMap, childAnyMap);
+            setFieldValue(parent, parentField, child);
+            childAnyMap.clear();
+        }
+    }
+
+    private void setFieldValue(Object obj, Field field, Object value) throws Exception {
+        boolean flag = field.isAccessible();
+        field.setAccessible(true);
+        field.set(obj, value);
+        field.setAccessible(flag);
     }
 
     /**
