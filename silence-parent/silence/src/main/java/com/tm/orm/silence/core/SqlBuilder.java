@@ -47,25 +47,25 @@ public class SqlBuilder {
      * @params [entity 实体对象, selective 是否过滤null值]
      * @desc 构建插入sql
      */
-    public String buildInsertSql(Object entity, boolean selective) {
+    public String buildInsertSql(Object entity) {
         if (null == entity) {
             throw new SqlException("entity can not be null");
         }
         //获取满足条件的字段，并将对应字段的值加入到threadLocal
-        return doBuildInsertSql(entity.getClass().getSimpleName(), getNames(getFields(entity, selective)));
+        return doBuildInsertSql(entity.getClass().getSimpleName(), getNames(getFields(entity)));
     }
 
     /**
      * @params [entity 实体对象, selective 是否过滤null值]
      * @desc 构建批量插入sql，并且将对应的值放入threadLocal
      */
-    public <T> String buildInsertListSql(List<T> entities, boolean selective) {
+    public <T> String buildInsertListSql(List<T> entities) {
         if (null == entities || entities.isEmpty()) {
             throw new SqlException("entities can not be empty");
         }
         //获取满足条件的字段，并将对应字段的值加入到threadLocal
         Object entity = entities.get(0);
-        List<Field> fields = getFields(entity, selective);
+        List<Field> fields = getFields(entity);
         List<Object> valuesList = new ArrayList<>();
         //添加第一个对象中字段的值
         valuesList.add(valuesThreadLocal.get());
@@ -82,8 +82,8 @@ public class SqlBuilder {
      * @params [entity 实体对象, selective 是否过滤null值]
      * @desc 构建通过主键更新sql
      */
-    public String buildUpdateByIdSql(Object entity, boolean selective) {
-        List<Field> fields = getFields(entity, selective);
+    public String buildUpdateByIdSql(Object entity) {
+        List<Field> fields = getFields(entity);
         StringBuilder sql = new StringBuilder("update ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, entity.getClass().getSimpleName())).append(" set ");
         for (String name : getNames(fields)) {
             sql.append("`");
@@ -101,7 +101,7 @@ public class SqlBuilder {
      */
     public String buildDeleteByIdSql(Object entity) {
         StringBuilder sql = new StringBuilder("delete from ").append(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, entity.getClass().getSimpleName()));
-        sql.append(" where ").append(getIdName(entity, getFields(entity, false))).append(" = ?");
+        sql.append(" where ").append(getIdName(entity, getFields(entity))).append(" = ?");
         return sql.toString();
     }
 
@@ -400,7 +400,7 @@ public class SqlBuilder {
      * @params [data 入参对象, selective 是否过滤null值]
      * @desc 解析非静态的成员属性，并且将对应的值存入threadLocal中
      */
-    private List<Field> getFields(Object data, boolean selective) {
+    private List<Field> getFields(Object data) {
         if (null == data) {
             throw new SqlException("obj can not be null");
         }
@@ -420,7 +420,7 @@ public class SqlBuilder {
             }
             try {
                 Object obj = field.get(data);
-                if (selective && null == obj) {
+                if (null == obj) {
                     continue;
                 }
                 values.add(obj);

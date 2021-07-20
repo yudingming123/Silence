@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import javax.sql.DataSource;
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -76,7 +77,7 @@ public class TestSvc {
             Table.insert(test);
         }
         long end = System.currentTimeMillis();
-        Table.simpleExecute("delete from test");
+        Table.simpleUpdate("delete from test");
         return end - begin;
     }
 
@@ -90,7 +91,7 @@ public class TestSvc {
             testMapper.insert();
         }
         long end = System.currentTimeMillis();
-        Table.simpleExecute("delete from test");
+        Table.simpleUpdate("delete from test");
         return end - begin;
     }
 
@@ -98,10 +99,10 @@ public class TestSvc {
     public Long add11() {
         long begin = System.currentTimeMillis();
         for (int i = 0; i < 1000; ++i) {
-            Table.simpleExecute("insert into test (name) values ('1')");
+            Table.simpleUpdate("insert into test (name) values ('1')");
         }
         long end = System.currentTimeMillis();
-        Table.simpleExecute("delete from test");
+        Table.simpleUpdate("delete from test");
         return end - begin;
     }
 
@@ -112,7 +113,7 @@ public class TestSvc {
             testMapper.insert();
         }
         long end = System.currentTimeMillis();
-        Table.simpleExecute("delete from test");
+        Table.simpleUpdate("delete from test");
         return end - begin;
     }
 
@@ -242,7 +243,7 @@ public class TestSvc {
         System.out.println(LocalDate.ofYearDay(2021, 182));
 
         byte[][][] model = new byte[9][11][30];*/
-        Class<?> clazz = Test.class;
+        /*Class<?> clazz = Test.class;
         String[] keys = {"id", "a", "name", "nameasd", "namesdb", "namexcv", "nameghjkkjkjjklg", "namesdfffdfg", "namewetsgfgj", "namewetsgfgffj", "namewetsgffhgj", "namewetsgkufgj", "namewetsggjfgj"};
         Map<String, String> map = new HashMap<>(100);
         for (int i = 0; i < 100; ++i) {
@@ -252,9 +253,9 @@ public class TestSvc {
         long s1 = System.nanoTime();
         //Map<String, Field> fieldMap = getFieldMap(clazz);
         for (int i = 0; i < 1000; ++i) {
-            /*for (String key : keys) {
+            *//*for (String key : keys) {
                 Field field = fieldMap.get(key);
-            }*/
+            }*//*
             map.clear();
         }
         long e1 = System.nanoTime();
@@ -262,14 +263,27 @@ public class TestSvc {
 
         long s2 = System.nanoTime();
         for (int i = 0; i < 1000; ++i) {
-            /*for (String key : keys) {
+            *//*for (String key : keys) {
                 Field field = clazz.getDeclaredField(key);
-            }*/
+            }*//*
             new HashMap<>();
         }
         long e2 = System.nanoTime();
-        System.out.println(e2 - s2);
+        System.out.println(e2 - s2);*/
 
+        Test test = select();
+        System.out.println(test.toString());
+
+    }
+
+    private static <T> T select() throws Exception {
+        return doSelect(new TypeReference<T>() {});
+    }
+
+    private static <T> T doSelect(TypeReference<T> tTypeReference) throws Exception {
+        Type type = tTypeReference.getType();
+        Class<?> clazz = type.getClass();
+        return (T) (clazz.newInstance());
     }
 
     private static boolean isTradingDay(LocalDate date) {

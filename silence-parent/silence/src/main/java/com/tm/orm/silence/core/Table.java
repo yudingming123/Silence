@@ -27,7 +27,7 @@ public class Table {
      * @desc 单条插入，为null的字段会被过滤掉
      */
     public static int insert(Object entity) {
-        return sqlExecutor.insert(entity, true, false);
+        return sqlExecutor.insert(entity);
     }
 
     /**
@@ -35,7 +35,7 @@ public class Table {
      * @desc 单条插入，并回显主键的值，为null的字段会被过滤掉
      */
     public static int insertAndEchoId(Object entity) {
-        return sqlExecutor.insert(entity, true, true);
+        return sqlExecutor.insertAndEchoId(entity);
     }
 
     /**
@@ -43,7 +43,7 @@ public class Table {
      * @desc 批量插入，为null的字段会被过滤掉
      */
     public static <T> int insertList(List<T> entities) {
-        return sqlExecutor.insertList(entities, true, false);
+        return sqlExecutor.insertList(entities);
     }
 
     /**
@@ -51,7 +51,7 @@ public class Table {
      * @desc 批量插入，并回显主键的值，为null的字段会被过滤掉
      */
     public static <T> int insertListAndEchoId(List<T> entities) {
-        return sqlExecutor.insertList(entities, true, true);
+        return sqlExecutor.insertListAndEchoId(entities);
     }
 
     /**
@@ -59,7 +59,7 @@ public class Table {
      * @desc 根据主键更新
      */
     public static int updateById(Object entity) {
-        return sqlExecutor.updateById(entity, true);
+        return sqlExecutor.updateById(entity);
     }
 
     /**
@@ -74,16 +74,16 @@ public class Table {
      * @params [sql 简单增删改sql语句，可含有占位符，但不能含有动态语句, data 占位符对应的参数列表]
      * @desc 通过简单sql进行增删改
      */
-    public static int simpleExecute(String sql, Object... data) {
-        return sqlExecutor.simpleExecute(sql, data);
+    public static int simpleUpdate(String sql, Object... data) {
+        return sqlExecutor.simpleUpdate(sql, data);
     }
 
     /**
      * @params [sql 复杂增删改sql语句，含有动态语句, data 参数]
      * @desc 通过带有动态语句的sql进行增删改
      */
-    public static int execute(String sql, Object data) {
-        return sqlExecutor.execute(sql, data);
+    public static int update(String sql, Object data) {
+        return sqlExecutor.update(sql, data);
     }
 
     /**
@@ -91,7 +91,7 @@ public class Table {
      * @Desc 通过主键查询
      **/
     public static <T> T selectById(Class<T> clazz, Object id) {
-        return sqlExecutor.doSelectOne(sqlExecutor.selectById(clazz, id));
+        return sqlExecutor.selectById(clazz, id);
     }
 
     /**
@@ -99,7 +99,7 @@ public class Table {
      * @desc 查询该表中所有数据
      **/
     public static <T> List<T> selectAll(Class<T> clazz) {
-        return sqlExecutor.simpleQuery(clazz, "select * from " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, clazz.getSimpleName()));
+        return sqlExecutor.simpleQueryList(clazz, "select * from " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, clazz.getSimpleName()));
     }
 
     /**
@@ -107,7 +107,7 @@ public class Table {
      * @desc 查询该表总数
      **/
     public static int selectCount(Class<?> clazz) {
-        return sqlExecutor.doSelectOne(sqlExecutor.simpleQuery(Integer.class, "select count(*) from " + clazz.getSimpleName()));
+        return sqlExecutor.simpleQueryOne(Integer.class, "select count(*) from " + clazz.getSimpleName());
     }
 
     /**
@@ -115,7 +115,7 @@ public class Table {
      * @desc 通过简单sql语句查询单个，
      */
     public static <T> T simpleSelectOne(Class<T> clazz, String sql, Object... data) {
-        return sqlExecutor.doSelectOne(sqlExecutor.simpleQuery(clazz, sql, data));
+        return sqlExecutor.simpleQueryOne(clazz, sql, data);
     }
 
     /**
@@ -123,23 +123,7 @@ public class Table {
      * @desc 通过简单sql语句查询多个
      */
     public static <T> List<T> simpleSelectList(Class<T> clazz, String sql, Object data) {
-        return sqlExecutor.simpleQuery(clazz, sql, data);
-    }
-
-    /**
-     * @params [clazz 需要返回的对象类型,sql 复杂查询sql语句，含有动态语句, data 参数]
-     * @desc 通过带有动态语句的sql查询单个
-     */
-    public static <T> T selectOne(Class<T> clazz, String sql, Object data) {
-        return sqlExecutor.doSelectOne(sqlExecutor.query(clazz, sql, data));
-    }
-
-    /**
-     * @params [clazz 需要返回的对象类型,sql 复杂查询sql语句，含有动态语句, data 参数]
-     * @desc 通过带有动态语句的sql查询多个
-     */
-    public static <T> List<T> selectList(Class<T> clazz, String sql, Object data) {
-        return sqlExecutor.query(clazz, sql, data);
+        return sqlExecutor.simpleQueryList(clazz, sql, data);
     }
 
     /**
@@ -148,6 +132,22 @@ public class Table {
      */
     public static <T> Page<T> simpleSelectPage(Class<T> clazz, Page<T> page, String sql, Object... data) {
         return sqlExecutor.simplePage(clazz, page, sql, data);
+    }
+
+    /**
+     * @params [clazz 需要返回的对象类型,sql 复杂查询sql语句，含有动态语句, data 参数]
+     * @desc 通过带有动态语句的sql查询单个
+     */
+    public static <T> T selectOne(Class<T> clazz, String sql, Object data) {
+        return sqlExecutor.queryOne(clazz, sql, data);
+    }
+
+    /**
+     * @params [clazz 需要返回的对象类型,sql 复杂查询sql语句，含有动态语句, data 参数]
+     * @desc 通过带有动态语句的sql查询多个
+     */
+    public static <T> List<T> selectList(Class<T> clazz, String sql, Object data) {
+        return sqlExecutor.queryList(clazz, sql, data);
     }
 
     /**
