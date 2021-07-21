@@ -2,6 +2,7 @@ package com.tm.orm.silence.core;
 
 
 import com.google.common.base.CaseFormat;
+import com.tm.orm.silence.exception.SqlException;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -27,6 +28,7 @@ public class Table {
      * @desc 单条插入，为null的字段会被过滤掉
      */
     public static int insert(Object entity) {
+        notNull(entity, "entity");
         return sqlExecutor.insert(entity);
     }
 
@@ -35,6 +37,7 @@ public class Table {
      * @desc 单条插入，并回显主键的值，为null的字段会被过滤掉
      */
     public static int insertAndEchoId(Object entity) {
+        notNull(entity, "entity");
         return sqlExecutor.insertAndEchoId(entity);
     }
 
@@ -42,7 +45,8 @@ public class Table {
      * @params [entities 实体对象列表]
      * @desc 批量插入，为null的字段会被过滤掉
      */
-    public static <T> int insertList(List<T> entities) {
+    public static int insertList(List<?> entities) {
+        notNull(entities, "entities");
         return sqlExecutor.insertList(entities);
     }
 
@@ -50,7 +54,8 @@ public class Table {
      * @params [entities 实体对象列表]
      * @desc 批量插入，并回显主键的值，为null的字段会被过滤掉
      */
-    public static <T> int insertListAndEchoId(List<T> entities) {
+    public static int insertListAndEchoId(List<Object> entities) {
+        notNull(entities, "entities");
         return sqlExecutor.insertListAndEchoId(entities);
     }
 
@@ -59,6 +64,7 @@ public class Table {
      * @desc 根据主键更新
      */
     public static int updateById(Object entity) {
+        notNull(entity, "entity");
         return sqlExecutor.updateById(entity);
     }
 
@@ -67,6 +73,7 @@ public class Table {
      * @desc 根据主键删除
      */
     public static int deleteById(Object entity) {
+        notNull(entity, "entity");
         return sqlExecutor.deleteById(entity);
     }
 
@@ -83,6 +90,7 @@ public class Table {
      * @desc 通过带有动态语句的sql进行增删改
      */
     public static int update(String sql, Object data) {
+        notNull(data, "data");
         return sqlExecutor.update(sql, data);
     }
 
@@ -91,6 +99,7 @@ public class Table {
      * @Desc 通过主键查询
      **/
     public static <T> T selectById(Class<T> clazz, Object id) {
+        notNull(clazz, "clazz");
         return sqlExecutor.selectById(clazz, id);
     }
 
@@ -99,6 +108,7 @@ public class Table {
      * @desc 查询该表中所有数据
      **/
     public static <T> List<T> selectAll(Class<T> clazz) {
+        notNull(clazz, "clazz");
         return sqlExecutor.simpleQueryList(clazz, "select * from " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, clazz.getSimpleName()));
     }
 
@@ -107,6 +117,7 @@ public class Table {
      * @desc 查询该表总数
      **/
     public static int selectCount(Class<?> clazz) {
+        notNull(clazz, "clazz");
         return sqlExecutor.simpleQueryOne(Integer.class, "select count(*) from " + clazz.getSimpleName());
     }
 
@@ -115,6 +126,7 @@ public class Table {
      * @desc 通过简单sql语句查询单个，
      */
     public static <T> T simpleSelectOne(Class<T> clazz, String sql, Object... data) {
+        notNull(clazz, "clazz");
         return sqlExecutor.simpleQueryOne(clazz, sql, data);
     }
 
@@ -123,6 +135,8 @@ public class Table {
      * @desc 通过简单sql语句查询多个
      */
     public static <T> List<T> simpleSelectList(Class<T> clazz, String sql, Object data) {
+        notNull(clazz, "clazz");
+        notNull(data, "data");
         return sqlExecutor.simpleQueryList(clazz, sql, data);
     }
 
@@ -131,6 +145,8 @@ public class Table {
      * @desc 通过简单sql语句分页查询
      */
     public static <T> Page<T> simpleSelectPage(Class<T> clazz, Page<T> page, String sql, Object... data) {
+        notNull(clazz, "clazz");
+        notNull(page, "page");
         return sqlExecutor.simplePage(clazz, page, sql, data);
     }
 
@@ -139,6 +155,8 @@ public class Table {
      * @desc 通过带有动态语句的sql查询单个
      */
     public static <T> T selectOne(Class<T> clazz, String sql, Object data) {
+        notNull(clazz, "clazz");
+        notNull(data, "data");
         return sqlExecutor.queryOne(clazz, sql, data);
     }
 
@@ -147,6 +165,8 @@ public class Table {
      * @desc 通过带有动态语句的sql查询多个
      */
     public static <T> List<T> selectList(Class<T> clazz, String sql, Object data) {
+        notNull(clazz, "clazz");
+        notNull(data, "data");
         return sqlExecutor.queryList(clazz, sql, data);
     }
 
@@ -155,7 +175,20 @@ public class Table {
      * @desc 通过带有动态语句的sql分页查询
      */
     public static <T> Page<T> selectPage(Class<T> clazz, Page<T> page, String sql, Object data) {
+        notNull(clazz, "clazz");
+        notNull(data, "data");
+        notNull(page, "page");
         return sqlExecutor.page(clazz, page, sql, data);
+    }
+
+    /**
+     * @Param [obj 参数, msg 信息]
+     * @Desc 非空判断
+     **/
+    private static void notNull(Object obj, String msg) {
+        if (null == obj) {
+            throw new SqlException(msg + " can not be null");
+        }
     }
 
     /**
