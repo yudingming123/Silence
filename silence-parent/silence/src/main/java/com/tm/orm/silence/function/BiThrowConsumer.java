@@ -3,8 +3,8 @@ package com.tm.orm.silence.function;
 import java.sql.SQLException;
 
 /**
- * @Author yudm
- * @Date 2021/7/20 14:52
+ * @author yudm
+ * @date 2021/7/20 14:52
  */
 @FunctionalInterface
 public interface BiThrowConsumer<P, V> {

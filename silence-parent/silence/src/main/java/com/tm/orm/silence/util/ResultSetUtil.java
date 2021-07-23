@@ -12,14 +12,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @Author yudm
- * @Date 2021/7/21 10:36
- * @Desc 结果集工具类
+ * @author yudm
+ * @date 2021/7/21 10:36
+ * @desc 结果集工具类
  */
 public class ResultSetUtil {
     /**
-     * @Param [rs 查询结果集, clazz 需要返回对象的字节码]
-     * @Desc 映射结果集到一个对象，如果结果集中有多行数据则抛出异常
+     * @params [rs 查询结果集, clazz 需要返回对象的字节码]
+     * @desc 映射结果集到一个对象，如果结果集中有多行数据则抛出异常
      **/
     public static <T> T mappingOne(ResultSet rs, Class<T> clazz) throws Exception {
         if (null == rs) {
@@ -65,8 +65,8 @@ public class ResultSetUtil {
     }
 
     /**
-     * @Param [rs 结果集, md 结果集元数据, fieldMap 字段集, anyChild 存放属于子对象的数据, clazz 需要返回对象的类型]
-     * @Desc 解析映射一行数据到一个对象中
+     * @params [rs 结果集, md 结果集元数据, fieldMap 字段集, anyChild 存放属于子对象的数据, clazz 需要返回对象的类型]
+     * @desc 解析映射一行数据到一个对象中
      **/
     public static <T> T mappingLine(ResultSet rs, ResultSetMetaData md, Map<String, Field> fieldMap, Map<String, Object> anyChild, Class<T> clazz) throws Exception {
         T t = clazz.newInstance();
@@ -85,8 +85,8 @@ public class ResultSetUtil {
     }
 
     /**
-     * @Param [parent 父对象, parentFieldMap 父对象的字段集, anyChild 存放属于子对象的数据]
-     * @Desc 递归映射子对象
+     * @params [parent 父对象, parentFieldMap 父对象的字段集, anyChild 存放属于子对象的数据]
+     * @desc 递归映射子对象
      **/
     public static void mappingChild(Object parent, Map<String, Field> parentFieldMap, Map<String, Object> anyChild) throws Exception {
         //存放 子对象名->(子对象中字段名->值)

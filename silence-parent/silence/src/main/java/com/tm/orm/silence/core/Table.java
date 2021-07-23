@@ -95,8 +95,8 @@ public class Table {
     }
 
     /**
-     * @Param [clazz 用于映射表、获取主键名、返回对象类型, id 主键值]
-     * @Desc 通过主键查询
+     * @params [clazz 用于映射表、获取主键名、返回对象类型, id 主键值]
+     * @desc 通过主键查询
      **/
     public static <T> T selectById(Class<T> clazz, Object id) {
         notNull(clazz, "clazz");
@@ -182,8 +182,8 @@ public class Table {
     }
 
     /**
-     * @Param [obj 参数, msg 信息]
-     * @Desc 非空判断
+     * @params [obj 参数, msg 信息]
+     * @desc 非空判断
      **/
     private static void notNull(Object obj, String msg) {
         if (null == obj) {
@@ -192,7 +192,7 @@ public class Table {
     }
 
     /**
-     * @Desc 获取service层调用者的包路径，用于切换数据源
+     * @desc 获取service层调用者的包路径，用于切换数据源
      **/
     private static String getPackagePath() {
         return Thread.currentThread().getStackTrace()[3].getClassName();
