@@ -5,20 +5,17 @@ import com.tm.orm.silence.exception.SqlException;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * @Author yudm
- * @Date 2021/7/21 10:29
- * @Desc 反射工具类
+ * @author yudm
+ * @date 2021/7/21 10:29
+ * @desc 反射工具类
  */
 public class ReflectUtil {
     /**
-     * @Param [obj 目标对象, field 字段, value 字段值]
-     * @Desc 给某个对象的某个字段设置值
+     * @params [obj 目标对象, field 字段, value 字段值]
+     * @desc 给某个对象的某个字段设置值
      **/
     public static void setFieldValue(Object obj, Field field, Object value) {
         boolean flag = field.isAccessible();
@@ -33,8 +30,8 @@ public class ReflectUtil {
     }
 
     /**
-     * @Param [obj 目标对象, field 字段]
-     * @Desc 获取字段的值
+     * @params [obj 目标对象, field 字段]
+     * @desc 获取字段的值
      **/
     public static Object getFieldValue(Object obj, Field field) {
         boolean accessible = field.isAccessible();
@@ -108,23 +105,76 @@ public class ReflectUtil {
     }
 
     /**
-     * @params [obj 入参]
-     * @desc 将入参转化成map
-     */
-    @SuppressWarnings("unchecked")
-    public static Map<String, Object> toMap(Object obj) {
-        Map<String, Object> param = new HashMap<>();
-        if (null == obj) {
-            return param;
+     * @params [obj 入参, keys sql语句中的参数名]
+     * @desc 将入参根据参数名转化成map
+     **/
+    public static Map<String, Object> toMap(Object obj, List<String> keys) {
+        if (null == obj && !keys.isEmpty()) {
+            throw new SqlException("param can not be null");
+        } else if (keys.isEmpty()) {
+            throw new SqlException("this sql does not require parameters,I suggest you use simple sql instead");
         }
-        if (obj instanceof Map) {
-            return (Map<String, Object>) obj;
-        }
+        //获取真正的key
+        List<String> realKeys = new ArrayList<>();
+        keys.forEach(s -> realKeys.add(StringUtil.replaceAll(s, StringUtil.PARAM_LABEL, "")));
+        //逐层解析一个对象成为map
+        return doToMap(obj, realKeys);
+    }
 
-        Field[] fields = obj.getClass().getDeclaredFields();
-        for (Field field : fields) {
-            param.put(field.getName(), getFieldValue(obj, field));
+    /**
+     * @params [obj 入参, keys sql语句中的参数名]
+     * @desc 执行将入参根据参数名转化成map
+     **/
+    private static Map<String, Object> doToMap(Object obj, List<String> keys) {
+        Map<String, Object> param = new HashMap<>();
+        //先解析第一层
+        if (obj instanceof Map<?, ?>) {
+            //强制转化会有安全风险，因此采用遍历的形式
+            ((Map<?, ?>) obj).forEach((k, v) -> {
+                String realKey;
+                if (k instanceof String) {
+                    realKey = (String) k;
+                } else {
+                    realKey = String.valueOf(k);
+                }
+                param.put(realKey, v);
+            });
+        } else {
+            Field[] fields = obj.getClass().getDeclaredFields();
+            for (Field field : fields) {
+                param.put(field.getName(), getFieldValue(obj, field));
+            }
         }
+        //将key按照父级key聚合
+        Map<String, List<String>> keyMap = new HashMap<>();
+        for (String key : keys) {
+            if (!key.contains(".")) {
+                continue;
+            }
+            int firstIndex = key.indexOf(".");
+            //子对象名
+            String head = key.substring(0, firstIndex);
+            //子对象中字段名
+            String left = key.substring(firstIndex + 1, key.length() - 1);
+            List<String> lefts = keyMap.get(head);
+            if (null == lefts) {
+                lefts = new ArrayList<>();
+                lefts.add(left);
+                keyMap.put(head, lefts);
+            } else {
+                lefts.add(left);
+            }
+        }
+        //解析子对象为map
+        keyMap.forEach((k, v) -> {
+            Object child = param.get(k);
+            if (null == child && !v.isEmpty()) {
+                throw new SqlException("there is no param named " + v);
+            } else if (null != child && !v.isEmpty()) {
+                param.put(k, doToMap(child, v));
+            }
+        });
         return param;
     }
+
 }

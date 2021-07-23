@@ -95,8 +95,8 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [clazz 实体类的字节码，用于映射表和获取主键名, id 主键值]
-     * @Desc 构建通过主键查询sql
+     * @params [clazz 实体类的字节码，用于映射表和获取主键名, id 主键值]
+     * @desc 构建通过主键查询sql
      **/
     public String buildSelectByIdSql(Class<?> clazz, Object id) {
         StringBuilder sql = new StringBuilder("select * from ").append(toUnderscore(clazz.getSimpleName()));
@@ -107,11 +107,11 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [sql 动态sql语句, data 参数]
-     * @Desc 根据动态sql和参数构建出最终的sql
+     * @params [sql 动态sql语句, data 参数]
+     * @desc 根据动态sql和参数构建出最终的sql
      **/
     public String build(String sql, Object data) {
-        Map<String, Object> param = toMap(data);
+        Map<String, Object> param = toMap(data, extractAll(sql, PRE_PARAM));
         //用于查找动态语句块的开始和结束位置
         return doBuild(sql, param);
     }
@@ -139,8 +139,8 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [sql 动态sql语句, param map参数]
-     * @Desc 执行根据动态sql和参数构建出最终的sql
+     * @params [sql 动态sql语句, param map参数]
+     * @desc 执行根据动态sql和参数构建出最终的sql
      **/
     private String doBuild(String sql, Map<String, Object> param) {
         ArrayList<Position> positions = getPositions(sql);
@@ -177,30 +177,21 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [sql 动态sql语句, param map参数]
-     * @Desc 解析包含参数的语句块
+     * @params [sql 动态sql语句, param map参数]
+     * @desc 解析包含参数的语句块
      **/
     private String paramBlock(String sql, Map<String, Object> param) {
         if (sql.contains("#{")) {
-            ArrayList<String> ks = extractAll(sql, PRE_PARAM);
+            List<String> ks = extractAll(sql, PRE_PARAM);
             for (String k : ks) {
-                //真正的变量名
-                k = replaceAll(k, PRE_PARAM_LABEL, "").trim();
-                if (!param.containsKey(k)) {
-                    throw new SqlException("there is no param named:" + k);
-                }
                 //加入到sql参数列表中
-                valuesThreadLocal.get().add(param.get(k));
+                valuesThreadLocal.get().add(getData(param, replaceAll(k, PRE_PARAM_LABEL, "").trim()));
             }
-            sql = replaceAll(sql, PRE_PARAM, "");
+            sql = replaceAll(sql, PRE_PARAM, "?");
         } else if (sql.contains("${")) {
-            ArrayList<String> ks = extractAll(sql, PARAM);
+            List<String> ks = extractAll(sql, NORMAL_PARAM);
             for (String t : ks) {
-                String k = replaceAll(t, PARAM_LABEL, "").trim();
-                if (!param.containsKey(k)) {
-                    throw new SqlException("there is no param named:" + k);
-                }
-                Object obj = param.get(k);
+                Object obj = getData(param, replaceAll(t, NORMAL_PARAM_LABEL, "").trim());
                 if (obj instanceof String) {
                     sql = sql.replace(t, (String) obj);
                 } else {
@@ -212,8 +203,8 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [sql 动态sql语句, param map参数]
-     * @Desc 解析if语句块
+     * @params [sql 动态sql语句, param map参数]
+     * @desc 解析if语句块
      **/
     private String ifBlock(String ds, Map<String, Object> param) {
         //if中的条件表达式
@@ -230,10 +221,7 @@ public class SqlBuilder {
         for (String k : ks) {
             //真正的变量名字
             k = split(k, OPERATOR)[0].trim();
-            if (null == param || !param.containsKey(k)) {
-                throw new SqlException("there is no param named:" + k);
-            }
-            jexlContext.set(k, param.get(k));
+            jexlContext.set(k, getData(param, k));
         }
         //如果表达式成立
         if ((boolean) expression.evaluate(jexlContext)) {
@@ -243,8 +231,8 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [sql 动态sql语句, param map参数]
-     * @Desc 解析where语句块
+     * @params [sql 动态sql语句, param map参数]
+     * @desc 解析where语句块
      **/
     private String whereBlock(String ds, Map<String, Object> param) {
         String w = doBuild(ds.substring(2, ds.length() - 1), param);
@@ -257,10 +245,9 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [sql 动态sql语句, param map参数]
-     * @Desc 解析foreach语句块
+     * @params [sql 动态sql语句, param map参数]
+     * @desc 解析foreach语句块
      **/
-    @SuppressWarnings("unchecked")
     private String foreachBlock(String ds, Map<String, Object> param) {
         //获取属性
         String attribute = replaceAll(extractFirst(ds, FOREACH_ATTR), FOREACH_LABEL, "");
@@ -274,22 +261,20 @@ public class SqlBuilder {
             }
             attributeMap.put(kv[0].trim(), kv[1].trim());
         }
+        //o:开始符号，c:结束符号，s:分隔符，i:每一项的名字，v:集合变量的名字
         if (!attributeMap.keySet().containsAll(Arrays.asList("o", "c", "s", "i", "v"))) {
             throw new SqlException("Attribute [o,c,s,i,v] is necessary");
         }
         //获取集合
-        String collectionName = attributeMap.get("v");
-        Object collection = param.get(collectionName);
-        if (null == collection) {
-            throw new SqlException(collectionName + ": can not be null");
-        }
-        if (!(collection instanceof Collection)) {
-            throw new SqlException(collectionName + " is not a collection");
+        String k = attributeMap.get("v");
+        Object v = getData(param, k);
+        if (!(v instanceof Collection<?>)) {
+            throw new SqlException(k + " is not a collection");
         }
         //开始拼接foreach语句块
         StringBuilder sb = new StringBuilder();
         sb.append(attributeMap.get("o"));
-        for (Object obj : (Collection<Object>) collection) {
+        for (Object obj : (Collection<?>) v) {
             param.put(attributeMap.get("i"), obj);
             sb.append(doBuild(replaceAll(extractFirst(ds, IF_FOREACH_CONTENT), IF_FOREACH_LABEL, ""), param));
             sb.append(attributeMap.get("s"));
@@ -298,6 +283,28 @@ public class SqlBuilder {
         sb.append(attributeMap.get("c"));
         sb.append(" ");
         return sb.toString();
+    }
+
+    private Object getData(Map<?, ?> param, String key) {
+        //key只有一级
+        if (!key.contains(".")) {
+            Object obj = param.get(key);
+            if (null == obj && !param.containsKey(key)) {
+                throw new SqlException("there is no param named:" + key);
+            }
+            return obj;
+        }
+        //key有多级
+        int firstIndex = key.indexOf(".");
+        //获取一级key
+        String head = key.substring(0, firstIndex);
+        Object value = param.get(head);
+        if (null == value && !param.containsKey(head)) {
+            throw new SqlException("there is no param named:" + head);
+        } else if (!(value instanceof Map<?, ?>)) {
+            throw new SqlException("there is no param named:" + key);
+        }
+        return getData((Map<?, ?>) value, key.substring(firstIndex + 1, key.length() - 1));
     }
 
     /**
@@ -335,8 +342,8 @@ public class SqlBuilder {
     }
 
     /**
-     * @Param [entity 实体类]
-     * @Desc 获取非静态、非null的字段列表
+     * @params [entity 实体类]
+     * @desc 获取非静态、非null的字段列表
      **/
     private List<Field> getRealFields(Object entity) {
         Class<?> clazz = entity.getClass();

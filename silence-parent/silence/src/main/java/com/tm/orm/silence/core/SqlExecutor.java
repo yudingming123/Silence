@@ -14,6 +14,7 @@ import javax.sql.DataSource;
 import java.sql.*;
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.logging.Logger;
 
 /**
  * @author yudm
@@ -100,8 +101,8 @@ public class SqlExecutor {
     }
 
     /**
-     * @Param [clazz 实体类对应字节码, id 主键值]
-     * @Desc 通过主键查询
+     * @params [clazz 实体类对应字节码, id 主键值]
+     * @desc 通过主键查询
      **/
     public <T> T selectById(Class<T> clazz, Object id) {
         return doQuery(sqlBuilder.buildSelectByIdSql(clazz, id), r -> ResultSetUtil.mappingOne(r, clazz));
@@ -158,8 +159,8 @@ public class SqlExecutor {
     }
 
     /**
-     * @Param [sql sql语句, fillPstConsumer 填充占位符的函数]
-     * @Desc 执行增删改
+     * @params [sql sql语句, fillPstConsumer 填充占位符的函数]
+     * @desc 执行增删改
      **/
     private int doUpdate(String sql, BiThrowConsumer<PreparedStatement, List<Object>> fillPstConsumer) {
         try (Connection con = DataSourceUtils.getConnection(dataSource); PreparedStatement pst = con.prepareStatement(sql)) {
@@ -174,8 +175,8 @@ public class SqlExecutor {
     }
 
     /**
-     * @Param [sql sql语句, fillPstConsumer 填充占位符的函数, echoIdConsumer 回显主键值的函数]
-     * @Desc 执行增删改，并回显主键值
+     * @params [sql sql语句, fillPstConsumer 填充占位符的函数, echoIdConsumer 回显主键值的函数]
+     * @desc 执行增删改，并回显主键值
      **/
     private int doUpdateAndEchoId(String sql, BiThrowConsumer<PreparedStatement, List<Object>> fillPstConsumer, ThrowConsumer<ResultSet> echoIdConsumer) {
         ResultSet rs = null;
@@ -214,8 +215,8 @@ public class SqlExecutor {
     }
 
     /**
-     * @Param [clazz 需要返回的类型, page 分页对象, sql sql语句, countFunc 查询数量的函数, listFunc 查询列表的函数]
-     * @Desc 执行分页查询
+     * @params [clazz 需要返回的类型, page 分页对象, sql sql语句, countFunc 查询数量的函数, listFunc 查询列表的函数]
+     * @desc 执行分页查询
      **/
     private <T> Page<T> doPage(Class<T> clazz, Page<T> page, String sql, BiFunction<Class<Integer>, String, Integer> countFunc, BiFunction<Class<T>, String, List<T>> listFunc) {
         if (page.isSearchTotal()) {
@@ -230,10 +231,12 @@ public class SqlExecutor {
      * @params [pst PreparedStatement, values 参数列表]
      * @desc 向批量占位符中填充值
      */
-    @SuppressWarnings("unchecked")
     private void fillPstList(PreparedStatement pst, List<?> values) throws SQLException {
         for (Object value : values) {
-            fillPst(pst, (List<Object>) value);
+            if (!(value instanceof List<?>)) {
+                throw new SqlException("your input is not a list");
+            }
+            fillPst(pst, (List<?>) value);
             pst.addBatch();
         }
     }
