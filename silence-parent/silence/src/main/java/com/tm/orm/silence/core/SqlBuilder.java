@@ -1,7 +1,7 @@
 package com.tm.orm.silence.core;
 
 import com.tm.orm.silence.exception.SqlException;
-import com.tm.orm.silence.util.StringUtil;
+
 import org.apache.commons.jexl2.Expression;
 import org.apache.commons.jexl2.JexlContext;
 import org.apache.commons.jexl2.JexlEngine;
@@ -10,7 +10,6 @@ import org.apache.commons.jexl2.MapContext;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.regex.Matcher;
 
 import static com.tm.orm.silence.util.StringUtil.*;
 import static com.tm.orm.silence.util.ReflectUtil.*;
@@ -144,14 +143,14 @@ public class SqlBuilder {
      * @desc 执行根据动态sql和参数构建出最终的sql
      **/
     private String doBuild(String sql, Map<String, Object> param) {
-        ArrayList<StringUtil.Position> positions = getPositions(sql, DYNAMIC_LABEL);
+        ArrayList<Position> positions = getPositions(sql, DYNAMIC_LABEL);
         if (positions.size() == 0) {//不存在动态语句
             return paramBlock(sql, param);
         } else {
             //截取第一个非动态语句
             StringBuilder sb = new StringBuilder(paramBlock(sql.substring(0, positions.get(0).getBegin()), param));
             for (int i = 0; i < positions.size(); ++i) {
-                StringUtil.Position position = positions.get(i);
+                Position position = positions.get(i);
                 //截取第i个动态语句
                 String ds = sql.substring(position.getBegin(), position.getEnd() + 1);
                 //如果是if语句块
