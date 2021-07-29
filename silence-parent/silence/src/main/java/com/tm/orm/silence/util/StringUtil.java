@@ -40,6 +40,10 @@ public class StringUtil {
     //参数语句块特殊字符
     public static final Pattern PARAM_LABEL = Pattern.compile("[#%]\\{|}");
     //预编译参数语句块
+    public static final Pattern PARAM = Pattern.compile("[#%]\\{.*?}");
+    //预编译参数语句块特殊字符
+    public static final Pattern PARAM_LABEL = Pattern.compile("[#%]\\{|}");
+    //预编译参数语句块
     public static final Pattern PRE_PARAM = Pattern.compile("#\\{.*?}");
     //预编译参数语句块特殊字符
     public static final Pattern PRE_PARAM_LABEL = Pattern.compile("#\\{|}");
