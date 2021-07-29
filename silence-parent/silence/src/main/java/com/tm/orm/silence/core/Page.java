@@ -8,10 +8,15 @@ import java.util.List;
  * @desc 分页的信息类
  */
 public class Page<T> {
+    //是否查询数量
     private boolean searchTotal;
+    //总数
     private int total;
+    //页号
     private int pageNum;
+    //每页大小
     private int pageSize;
+    //数据列表
     private List<T> list;
 
     public Page(int pageNum, int pageSize, boolean searchTotal) {

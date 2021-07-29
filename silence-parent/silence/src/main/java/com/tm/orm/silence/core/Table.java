@@ -1,12 +1,12 @@
 package com.tm.orm.silence.core;
 
-
-import com.google.common.base.CaseFormat;
 import com.tm.orm.silence.exception.SqlException;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.List;
+
+import static com.tm.orm.silence.util.StringUtil.toUnderscore;
 
 /**
  * @author yudm
@@ -109,7 +109,7 @@ public class Table {
      **/
     public static <T> List<T> selectAll(Class<T> clazz) {
         notNull(clazz, "clazz");
-        return sqlExecutor.simpleQueryList(clazz, "select * from " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, clazz.getSimpleName()));
+        return sqlExecutor.simpleQueryList(clazz, "select * from " + toUnderscore(clazz.getSimpleName()));
     }
 
     /**
@@ -118,7 +118,7 @@ public class Table {
      **/
     public static int selectCount(Class<?> clazz) {
         notNull(clazz, "clazz");
-        return sqlExecutor.simpleQueryOne(Integer.class, "select count(*) from " + clazz.getSimpleName());
+        return sqlExecutor.simpleQueryOne(Integer.class, "select count(*) from " + toUnderscore(clazz.getSimpleName()));
     }
 
     /**
@@ -185,9 +185,9 @@ public class Table {
      * @params [obj 参数, msg 信息]
      * @desc 非空判断
      **/
-    private static void notNull(Object obj, String msg) {
+    private static void notNull(Object obj, String title) {
         if (null == obj) {
-            throw new SqlException(msg + " can not be null");
+            throw new SqlException(title + " can not be null");
         }
     }
 

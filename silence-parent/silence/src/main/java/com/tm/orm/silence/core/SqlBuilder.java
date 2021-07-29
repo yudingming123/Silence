@@ -1,6 +1,7 @@
 package com.tm.orm.silence.core;
 
 import com.tm.orm.silence.exception.SqlException;
+import com.tm.orm.silence.util.StringUtil;
 import org.apache.commons.jexl2.Expression;
 import org.apache.commons.jexl2.JexlContext;
 import org.apache.commons.jexl2.JexlEngine;
@@ -111,7 +112,7 @@ public class SqlBuilder {
      * @desc 根据动态sql和参数构建出最终的sql
      **/
     public String build(String sql, Object data) {
-        Map<String, Object> param = toMap(data, extractAll(sql, PRE_PARAM));
+        Map<String, Object> param = toMap(data, extractAll(sql, PARAM));
         //用于查找动态语句块的开始和结束位置
         return doBuild(sql, param);
     }
@@ -143,14 +144,14 @@ public class SqlBuilder {
      * @desc 执行根据动态sql和参数构建出最终的sql
      **/
     private String doBuild(String sql, Map<String, Object> param) {
-        ArrayList<Position> positions = getPositions(sql);
+        ArrayList<StringUtil.Position> positions = getPositions(sql, DYNAMIC_LABEL);
         if (positions.size() == 0) {//不存在动态语句
             return paramBlock(sql, param);
         } else {
             //截取第一个非动态语句
             StringBuilder sb = new StringBuilder(paramBlock(sql.substring(0, positions.get(0).getBegin()), param));
             for (int i = 0; i < positions.size(); ++i) {
-                Position position = positions.get(i);
+                StringUtil.Position position = positions.get(i);
                 //截取第i个动态语句
                 String ds = sql.substring(position.getBegin(), position.getEnd() + 1);
                 //如果是if语句块
@@ -185,13 +186,13 @@ public class SqlBuilder {
             List<String> ks = extractAll(sql, PRE_PARAM);
             for (String k : ks) {
                 //加入到sql参数列表中
-                valuesThreadLocal.get().add(getData(param, replaceAll(k, PRE_PARAM_LABEL, "").trim()));
+                valuesThreadLocal.get().add(getValueFromMap(param, replaceAll(k, PRE_PARAM_LABEL, "").trim()));
             }
             sql = replaceAll(sql, PRE_PARAM, "?");
         } else if (sql.contains("${")) {
             List<String> ks = extractAll(sql, NORMAL_PARAM);
             for (String t : ks) {
-                Object obj = getData(param, replaceAll(t, NORMAL_PARAM_LABEL, "").trim());
+                Object obj = getValueFromMap(param, replaceAll(t, NORMAL_PARAM_LABEL, "").trim());
                 if (obj instanceof String) {
                     sql = sql.replace(t, (String) obj);
                 } else {
@@ -221,7 +222,7 @@ public class SqlBuilder {
         for (String k : ks) {
             //真正的变量名字
             k = split(k, OPERATOR)[0].trim();
-            jexlContext.set(k, getData(param, k));
+            jexlContext.set(k, getValueFromMap(param, k));
         }
         //如果表达式成立
         if ((boolean) expression.evaluate(jexlContext)) {
@@ -267,7 +268,7 @@ public class SqlBuilder {
         }
         //获取集合
         String k = attributeMap.get("v");
-        Object v = getData(param, k);
+        Object v = getValueFromMap(param, k);
         if (!(v instanceof Collection<?>)) {
             throw new SqlException(k + " is not a collection");
         }
@@ -283,62 +284,6 @@ public class SqlBuilder {
         sb.append(attributeMap.get("c"));
         sb.append(" ");
         return sb.toString();
-    }
-
-    private Object getData(Map<?, ?> param, String key) {
-        //key只有一级
-        if (!key.contains(".")) {
-            Object obj = param.get(key);
-            if (null == obj && !param.containsKey(key)) {
-                throw new SqlException("there is no param named:" + key);
-            }
-            return obj;
-        }
-        //key有多级
-        int firstIndex = key.indexOf(".");
-        //获取一级key
-        String head = key.substring(0, firstIndex);
-        Object value = param.get(head);
-        if (null == value && !param.containsKey(head)) {
-            throw new SqlException("there is no param named:" + head);
-        } else if (!(value instanceof Map<?, ?>)) {
-            throw new SqlException("there is no param named:" + key);
-        }
-        return getData((Map<?, ?>) value, key.substring(firstIndex + 1, key.length() - 1));
-    }
-
-    /**
-     * @params [sql 动态sql语句]
-     * @desc 解析动态语句块开始和结束的位置
-     */
-    private ArrayList<Position> getPositions(String sql) {
-        ArrayList<Position> positions = new ArrayList<>();
-        ArrayList<Integer> begins = new ArrayList<>();
-        ArrayList<Integer> ends = new ArrayList<>();
-
-        Matcher matcher = DYNAMIC_LABEL.matcher(sql);
-        while (matcher.find()) {
-            if (matcher.group(0).contains("[")) {
-                begins.add(matcher.start());
-            } else if (matcher.group(0).contains("]")) {
-                ends.add(matcher.start());
-            }
-            //如果数量相同说明已经是一个最大的完整的动态语句块
-            if (begins.size() == ends.size()) {
-                //只获取最外层的位置
-                Position position = new Position();
-                position.setBegin(begins.get(0));
-                position.setEnd(ends.get(begins.size() - 1));
-                positions.add(position);
-                begins.clear();
-                ends.clear();
-            }
-        }
-        //如果最终数量不相等，则动态语句块没有闭合
-        if (begins.size() != ends.size()) {
-            throw new SqlException("sql statement error: '[' is not closed");
-        }
-        return positions;
     }
 
     /**
@@ -367,31 +312,5 @@ public class SqlBuilder {
         }
         valuesThreadLocal.set(values);
         return realFields;
-    }
-
-    /**
-     * @author yudm
-     * @date 2021/1/1 13:16
-     * @desc 用于记录动态语句块开始和结束位置的类
-     */
-    static class Position {
-        private int begin;
-        private int end;
-
-        public int getBegin() {
-            return begin;
-        }
-
-        public void setBegin(int begin) {
-            this.begin = begin;
-        }
-
-        public int getEnd() {
-            return end;
-        }
-
-        public void setEnd(int end) {
-            this.end = end;
-        }
     }
 }

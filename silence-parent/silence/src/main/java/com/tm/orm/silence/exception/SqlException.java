@@ -1,6 +1,5 @@
 package com.tm.orm.silence.exception;
 
-
 /**
  * @author yudm
  * @date 2020/12/25 16:05

@@ -1,6 +1,5 @@
 package com.tm.orm.silence.util;
 
-
 import com.tm.orm.silence.exception.SqlException;
 
 import java.lang.reflect.Field;
@@ -119,6 +118,32 @@ public class ReflectUtil {
         keys.forEach(s -> realKeys.add(StringUtil.replaceAll(s, StringUtil.PARAM_LABEL, "")));
         //逐层解析一个对象成为map
         return doToMap(obj, realKeys);
+    }
+
+    /**
+     * @params [param , key]
+     * @desc 通过key从param中获取值，key可以是多级的
+     **/
+    public static Object getValueFromMap(Map<?, ?> param, String key) {
+        //key只有一级
+        if (!key.contains(".")) {
+            Object obj = param.get(key);
+            if (null == obj && !param.containsKey(key)) {
+                throw new SqlException("there is no param named:" + key);
+            }
+            return obj;
+        }
+        //key有多级
+        int firstIndex = key.indexOf(".");
+        //获取一级key
+        String head = key.substring(0, firstIndex);
+        Object value = param.get(head);
+        if (null == value && !param.containsKey(head)) {
+            throw new SqlException("there is no param named:" + head);
+        } else if (!(value instanceof Map<?, ?>)) {
+            throw new SqlException("there is no param named:" + key);
+        }
+        return getValueFromMap((Map<?, ?>) value, key.substring(firstIndex + 1, key.length() - 1));
     }
 
     /**
